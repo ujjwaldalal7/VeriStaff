@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  HR_ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmployeeStatus {
+  INVITED
+  ONBOARDING
+  ACTIVE
+  RESIGNED
+  OFFBOARDED
+}
+
+enum DocType {
+  OFFER_LETTER
+  PAYSLIP
+  RELIEVING_LETTER
+  EXPERIENCE_LETTER
+}
+
+enum ClearanceDept {
+  IT
+  FINANCE
+  HR
+}
+
+enum ClearanceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Tenant {
+  id                 String              @id @default(uuid())
+  name               String
+  domain             String              @unique
+  logoUrl            String?
+  watermarkUrl       String?
+  primaryColor       String              @default("#1E40AF")
+  secondaryColor     String              @default("#3B82F6")
+  footerAddress      String              @default("")
+  authorizedSignUrl  String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  users              User[]
+  employees          Employee[]
+  documents          GeneratedDocument[]
+  onboardingInvites  OnboardingInvite[]
+}
+
+model User {
+  id               String               @id @default(uuid())
+  tenantId         String
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email            String               @unique
+  passwordHash     String
+  role             Role                 @default(EMPLOYEE)
+  employee         Employee?
+  clearancesDone   DepartmentClearance[] @relation("ClearedBy")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([tenantId])
+}
+
+model Employee {
+  id               String               @id @default(uuid())
+  tenantId         String
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId           String?              @unique
+  user             User?                @relation(fields: [userId], references: [id])
+  employeeCode     String
+  firstName        String
+  lastName         String
+  department       String
+  designation      String
+  joiningDate      DateTime
+  resignationDate  DateTime?
+  lastWorkingDay   DateTime?
+  status           EmployeeStatus       @default(INVITED)
+  basicSalary      Float                @default(0)
+  hra              Float                @default(0)
+  allowances       Float                @default(0)
+  deductions       Float                @default(0)
+  bankAccountNo    String?
+  bankIfsc         String?
+  panCard          String?
+  nationalIdUrl    String?
+  documents        GeneratedDocument[]
+  clearances       DepartmentClearance[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@unique([tenantId, employeeCode])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model OnboardingInvite {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String
+  token       String   @unique
+  expiresAt   DateTime
+  isUsed      Boolean  @default(false)
+  employeeId  String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, email])
+  @@index([token])
+}
+
+model GeneratedDocument {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId       String
+  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  docNumber        String    @unique
+  docType          DocType
+  verificationHash String    @unique
+  pdfUrl           String?
+  metadataJson     Json
+  createdAt        DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([employeeId])
+  @@index([verificationHash])
+}
+
+model DepartmentClearance {
+  id          String          @id @default(uuid())
+  employeeId  String
+  employee    Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  department  ClearanceDept
+  status      ClearanceStatus @default(PENDING)
+  remarks     String?
+  clearedBy   User?           @relation("ClearedBy", fields: [clearedById], references: [id])
+  clearedById String?
+  clearedAt   DateTime?
+
+  @@unique([employeeId, department])
+  @@index([employeeId])
+}
