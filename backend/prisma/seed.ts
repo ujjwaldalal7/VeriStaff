@@ -10,7 +10,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const passwordHash = await hashPassword("Admin@12345");
+  const passwordHash = await hashPassword("<your-admin-password-here>");
 
   const tenant = await prisma.tenant.upsert({
     where: { domain: "demo.veristaff.local" },
@@ -66,7 +66,7 @@ async function main() {
   console.log("Seed complete:", {
     tenant: tenant.domain,
     adminEmail: "admin@veristaff.local",
-    adminPassword: "Admin@12345",
+    adminPassword: "<your-admin-password-here>",
     employeeId: employee.id
   });
 }
