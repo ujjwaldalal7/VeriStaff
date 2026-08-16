@@ -1,25 +1,51 @@
 import { Router } from "express";
 import {
-  listClearances,
-  updateClearance
+  submitResignation,
+  getEmployeeClearances,
+  updateClearance,
+  getClearanceStatus
 } from "../controllers/clearance.controller.js";
 import { authenticate } from "../middlewares/auth.js";
 import { authorize } from "../middlewares/authorize.js";
 
 const router = Router();
 
-router.use(authenticate);
+router.post(
+  "/employees/:employeeId/resignation",
+  authenticate,
+  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  submitResignation
+);
 
 router.get(
-  "/:employeeId",
-  authorize("SUPER_ADMIN", "HR_ADMIN"),
-  listClearances
+  "/employees/:employeeId",
+  authenticate,
+  authorize(
+    "SUPER_ADMIN",
+    "HR_ADMIN",
+    "MANAGER",
+    "EMPLOYEE"
+  ),
+  getEmployeeClearances
 );
 
 router.patch(
-  "/:employeeId/:department",
+  "/employees/:employeeId/:department",
+  authenticate,
   authorize("SUPER_ADMIN", "HR_ADMIN"),
   updateClearance
+);
+
+router.get(
+  "/employees/:employeeId/status",
+  authenticate,
+  authorize(
+    "SUPER_ADMIN",
+    "HR_ADMIN",
+    "MANAGER",
+    "EMPLOYEE"
+  ),
+  getClearanceStatus
 );
 
 export default router;

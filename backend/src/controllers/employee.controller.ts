@@ -5,7 +5,7 @@ import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
-
+import { ensureEmployeeAccess } from "../utils/employeeAccess.js";
 
 const createEmployeeSchema = z.object({
   employeeCode: z.string().min(1).max(30),
@@ -125,9 +125,16 @@ export const getEmployee = asyncHandler(async (req: Request, res: Response) => {
     }
   });
 
-  if (!employee) throw new ApiError(404, "Employee not found");
+  if (!employee) {
+    throw new ApiError(404, "Employee not found");
+  }
 
-  res.json({ success: true, data: employee });
+  ensureEmployeeAccess(employee, auth);
+
+  res.json({
+    success: true,
+    data: employee
+  });
 });
 
 export const updateEmployee = asyncHandler(async (req: Request, res: Response) => {
