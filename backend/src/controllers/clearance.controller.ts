@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
-
+import { getRequiredParam } from "../utils/requestParams.js";
 const updateSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
   remarks: z.string().max(1000).optional()
@@ -22,7 +22,7 @@ export const listClearances = asyncHandler(async (req: Request, res: Response) =
 
   const employee = await prisma.employee.findFirst({
     where: {
-      id: req.params.employeeId,
+      id: getRequiredParam(req, "employeeId"),
       tenantId: auth.tenantId
     }
   });
@@ -46,15 +46,17 @@ export const updateClearance = asyncHandler(async (req: Request, res: Response) 
   const auth = (req as AuthRequest).user!;
   const data = updateSchema.parse(req.body);
 
-  const department = req.params.department as "IT" | "FINANCE" | "HR";
+  const departmentParam = getRequiredParam(req, "department");
 
-  if (!["IT", "FINANCE", "HR"].includes(department)) {
-    throw new ApiError(400, "Invalid clearance department");
-  }
+if (!["IT", "FINANCE", "HR"].includes(departmentParam)) {
+  throw new ApiError(400, "Invalid clearance department");
+}
+
+const department = departmentParam as "IT" | "FINANCE" | "HR";
 
   const employee = await prisma.employee.findFirst({
     where: {
-      id: req.params.employeeId,
+      id: getRequiredParam(req, "employeeId"),
       tenantId: auth.tenantId
     }
   });

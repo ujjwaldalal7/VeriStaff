@@ -2,11 +2,14 @@ import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import type { AuthRequest } from "../types/auth.js";
+import { getRequiredParam } from "../utils/requestParams.js";
+
 
 export const verifyDocument = asyncHandler(async (req: Request, res: Response) => {
   const document = await prisma.generatedDocument.findUnique({
     where: {
-      verificationHash: req.params.hash
+      verificationHash: getRequiredParam(req, "hash")
     },
     include: {
       tenant: {

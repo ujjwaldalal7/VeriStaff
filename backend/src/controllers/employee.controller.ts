@@ -4,6 +4,8 @@ import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
+import { getRequiredParam } from "../utils/requestParams.js";
+
 
 const createEmployeeSchema = z.object({
   employeeCode: z.string().min(1).max(30),
@@ -36,7 +38,6 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
     throw new ApiError(409, "Employee code already exists in this organization");
   }
 
-  let userId: string | undefined;
 
   if (data.email) {
     const existingUser = await prisma.user.findUnique({
@@ -67,7 +68,7 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
   res.status(201).json({
     success: true,
     message: "Employee created",
-    data: { ...employee, userId }
+    data: employee
   });
 });
 
@@ -105,7 +106,7 @@ export const getEmployee = asyncHandler(async (req: Request, res: Response) => {
 
   const employee = await prisma.employee.findFirst({
     where: {
-      id: req.params.id,
+      id: getRequiredParam(req, "id"),
       tenantId: auth.tenantId
     },
     include: {
@@ -135,7 +136,7 @@ export const updateEmployee = asyncHandler(async (req: Request, res: Response) =
 
   const employee = await prisma.employee.findFirst({
     where: {
-      id: req.params.id,
+      id: getRequiredParam(req, "id"),
       tenantId: auth.tenantId
     }
   });
@@ -166,7 +167,7 @@ export const resignEmployee = asyncHandler(async (req: Request, res: Response) =
 
   const employee = await prisma.employee.findFirst({
     where: {
-      id: req.params.id,
+      id: getRequiredParam(req, "id"),
       tenantId: auth.tenantId
     }
   });

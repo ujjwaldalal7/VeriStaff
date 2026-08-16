@@ -6,6 +6,8 @@ import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { createSecureToken } from "../utils/tokens.js";
 import type { AuthRequest } from "../types/auth.js";
+import { getRequiredParam } from "../utils/requestParams.js";
+
 
 const inviteSchema = z.object({
   employeeId: z.string().uuid(),
@@ -62,7 +64,9 @@ export const createInvite = asyncHandler(async (req: Request, res: Response) => 
 
 export const validateInvite = asyncHandler(async (req: Request, res: Response) => {
   const invite = await prisma.onboardingInvite.findUnique({
-    where: { token: req.params.token },
+    where: {
+  token: getRequiredParam(req, "token")
+},
     include: {
       tenant: {
         select: {
@@ -95,7 +99,9 @@ export const completeOnboarding = asyncHandler(async (req: Request, res: Respons
 
   const result = await prisma.$transaction(async (tx) => {
     const invite = await tx.onboardingInvite.findUnique({
-      where: { token: req.params.token }
+      where: {
+            token: getRequiredParam(req, "token")
+}
     });
 
     if (!invite || invite.isUsed || invite.expiresAt <= new Date()) {
