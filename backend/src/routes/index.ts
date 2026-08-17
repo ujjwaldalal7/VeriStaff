@@ -10,7 +10,7 @@ import verificationRoutes from "./verification.routes.js";
 const router = Router();
 
 router.use("/auth", authRoutes);
-router.use("/tenant", tenantRoutes);
+router.use("/tenants", tenantRoutes);
 router.use("/employees", employeeRoutes);
 router.use("/onboarding", onboardingRoutes);
 router.use("/clearances", clearanceRoutes);

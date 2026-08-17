@@ -4,6 +4,8 @@ import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
+import { uploadImageToCloudinary } from "../services/cloudinary.service.js";
+import { getRequiredParam } from "../utils/requestParams.js";
 
 const brandingSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -42,3 +44,85 @@ export const updateBranding = asyncHandler(async (req: Request, res: Response) =
     data: tenant
   });
 });
+
+
+export const uploadTenantBrandingAsset = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    if (!req.file) {
+      throw new ApiError(
+        400,
+        "Image file is required"
+      );
+    }
+
+    const assetType = getRequiredParam(req, "assetType");
+
+    const allowedAssetTypes = [
+      "logo",
+      "watermark",
+      "signature"
+    ];
+
+    if (
+      !allowedAssetTypes.includes(assetType)
+    ) {
+      throw new ApiError(
+        400,
+        "Invalid branding asset type"
+      );
+    }
+
+    const publicId =
+      `tenant-${auth.tenantId}-${assetType}`;
+
+    const imageUrl =
+      await uploadImageToCloudinary(
+        req.file.buffer,
+        publicId
+      );
+
+    let updateData: {
+      logoUrl?: string;
+      watermarkUrl?: string;
+      authorizedSignUrl?: string;
+    };
+
+    if (assetType === "logo") {
+      updateData = {
+        logoUrl: imageUrl
+      };
+    } else if (assetType === "watermark") {
+      updateData = {
+        watermarkUrl: imageUrl
+      };
+    } else {
+      updateData = {
+        authorizedSignUrl: imageUrl
+      };
+    }
+
+    const tenant =
+      await prisma.tenant.update({
+        where: {
+          id: auth.tenantId
+        },
+
+        data: updateData
+      });
+
+    res.json({
+      success: true,
+
+      message:
+        `${assetType} uploaded successfully`,
+
+      data: {
+        assetType,
+        imageUrl,
+        tenant
+      }
+    });
+  }
+);
