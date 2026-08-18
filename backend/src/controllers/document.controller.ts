@@ -14,6 +14,8 @@ import { generatePdfFromHtml } from "../services/pdf.service.js";
 import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
 
 import { experienceLetterTemplate } from "../templates/experienceLetter.template.js";
+import { relievingLetterTemplate } from "../templates/relievingLetter.template.js";
+import { offerLetterTemplate } from "../templates/offerLetter.template.js";
 
 const documentSchema = z.object({
   employeeId: z.string().uuid(),
@@ -34,6 +36,15 @@ const clearanceRequiredDocTypes = new Set([
   "RELIEVING_LETTER",
   "EXPERIENCE_LETTER"
 ]);
+
+const supportedDocumentTypes = [
+  "OFFER_LETTER",
+  "RELIEVING_LETTER",
+  "EXPERIENCE_LETTER"
+] as const;
+
+type SupportedDocumentType =
+  (typeof supportedDocumentTypes)[number];
 
 const formatDate = (date: Date): string => {
   return date.toLocaleDateString("en-IN", {
@@ -59,11 +70,17 @@ export const createDocumentRecord = asyncHandler(
   async (req: Request, res: Response) => {
     const auth = (req as AuthRequest).user!;
 
+    /*
+     * ---------------------------------------------------------
+     * 1. Validate request body
+     * ---------------------------------------------------------
+     */
+
     const data = documentSchema.parse(req.body);
 
     /*
      * ---------------------------------------------------------
-     * 1. Find employee inside authenticated tenant
+     * 2. Find employee inside authenticated tenant
      * ---------------------------------------------------------
      */
 
@@ -78,16 +95,58 @@ export const createDocumentRecord = asyncHandler(
     });
 
     if (!employee) {
-      throw new ApiError(404, "Employee not found");
+      throw new ApiError(
+        404,
+        "Employee not found"
+      );
     }
 
     /*
      * ---------------------------------------------------------
-     * 2. Check clearance before exit documents
+     * 3. Validate supported document type
      * ---------------------------------------------------------
      */
 
-    if (clearanceRequiredDocTypes.has(data.docType)) {
+    if (
+      !supportedDocumentTypes.includes(
+        data.docType as SupportedDocumentType
+      )
+    ) {
+      throw new ApiError(
+        400,
+        `${data.docType} document generation will be implemented next`
+      );
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * 4. Offer Letter eligibility
+     * ---------------------------------------------------------
+     */
+
+    if (data.docType === "OFFER_LETTER") {
+      if (
+        employee.status !== "INVITED" &&
+        employee.status !== "ONBOARDING"
+      ) {
+        throw new ApiError(
+          400,
+          "Offer letter can only be generated for an invited or onboarding employee"
+        );
+      }
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * 5. Exit document clearance validation
+     * ---------------------------------------------------------
+     */
+
+    if (
+      clearanceRequiredDocTypes.has(
+        data.docType
+      )
+    ) {
       const clearances =
         await prisma.departmentClearance.findMany({
           where: {
@@ -101,14 +160,17 @@ export const createDocumentRecord = asyncHandler(
         "HR"
       ];
 
-      const allApproved = requiredDepartments.every(
-        (department) =>
-          clearances.some(
-            (clearance) =>
-              clearance.department === department &&
-              clearance.status === "APPROVED"
-          )
-      );
+      const allApproved =
+        requiredDepartments.every(
+          (department) =>
+            clearances.some(
+              (clearance) =>
+                clearance.department ===
+                  department &&
+                clearance.status ===
+                  "APPROVED"
+            )
+        );
 
       if (!allApproved) {
         throw new ApiError(
@@ -116,36 +178,34 @@ export const createDocumentRecord = asyncHandler(
           "All IT, Finance and HR clearances must be approved before generating this document"
         );
       }
+
+      if (
+        employee.status !== "OFFBOARDED"
+      ) {
+        throw new ApiError(
+          403,
+          "Employee must be offboarded before generating exit documents"
+        );
+      }
     }
 
     /*
      * ---------------------------------------------------------
-     * 3. Currently support Experience Letter generation
+     * 6. Generate document number
      * ---------------------------------------------------------
      */
 
-    if (data.docType !== "EXPERIENCE_LETTER") {
-      throw new ApiError(
-        400,
-        `${data.docType} document generation will be implemented next`
-      );
-    }
+    const docNumber =
+      generateDocumentNumber();
 
     /*
      * ---------------------------------------------------------
-     * 4. Generate unique document number
+     * 7. Generate verification hash
      * ---------------------------------------------------------
      */
 
-    const docNumber = generateDocumentNumber();
-
-    /*
-     * ---------------------------------------------------------
-     * 5. Generate SHA-256 verification hash
-     * ---------------------------------------------------------
-     */
-
-    const timestamp = new Date().toISOString();
+    const timestamp =
+      new Date().toISOString();
 
     const hashPayload = [
       employee.tenantId,
@@ -155,11 +215,12 @@ export const createDocumentRecord = asyncHandler(
       timestamp
     ].join(":");
 
-    const verificationHash = createSha256(hashPayload);
+    const verificationHash =
+      createSha256(hashPayload);
 
     /*
      * ---------------------------------------------------------
-     * 6. Generate public verification URL
+     * 8. Generate verification URL
      * ---------------------------------------------------------
      */
 
@@ -168,30 +229,41 @@ export const createDocumentRecord = asyncHandler(
 
     /*
      * ---------------------------------------------------------
-     * 7. Generate QR code
+     * 9. Generate QR code
      * ---------------------------------------------------------
      */
 
     const qrDataUrl =
-      await QRCode.toDataURL(verificationUrl, {
-        errorCorrectionLevel: "H",
-        margin: 1,
-        width: 300
-      });
+      await QRCode.toDataURL(
+        verificationUrl,
+        {
+          errorCorrectionLevel: "H",
+          margin: 1,
+          width: 300
+        }
+      );
 
     /*
      * ---------------------------------------------------------
-     * 8. Prepare branded Experience Letter
+     * 10. Common branded data
      * ---------------------------------------------------------
      */
 
     const employeeName =
       `${employee.firstName} ${employee.lastName}`;
 
-    const html = experienceLetterTemplate({
-      companyName: employee.tenant.name,
+    const totalSalary =
+      employee.basicSalary +
+      employee.hra +
+      employee.allowances -
+      employee.deductions;
 
-      logoUrl: employee.tenant.logoUrl,
+    const commonTemplateData = {
+      companyName:
+        employee.tenant.name,
+
+      logoUrl:
+        employee.tenant.logoUrl,
 
       watermarkUrl:
         employee.tenant.watermarkUrl,
@@ -220,14 +292,19 @@ export const createDocumentRecord = asyncHandler(
         employee.department,
 
       joiningDate:
-        formatDate(employee.joiningDate),
+        formatDate(
+          employee.joiningDate
+        ),
 
       lastWorkingDay:
         employee.lastWorkingDay
-          ? formatDate(employee.lastWorkingDay)
+          ? formatDate(
+              employee.lastWorkingDay
+            )
           : "N/A",
 
-      documentNumber: docNumber,
+      documentNumber:
+        docNumber,
 
       issueDate:
         formatDate(new Date()),
@@ -235,20 +312,78 @@ export const createDocumentRecord = asyncHandler(
       verificationUrl,
 
       qrDataUrl
-    });
+    };
 
     /*
      * ---------------------------------------------------------
-     * 9. Generate PDF using Puppeteer
+     * 11. Generate document HTML
+     * ---------------------------------------------------------
+     */
+
+    let html: string;
+
+    if (data.docType === "EXPERIENCE_LETTER") {
+      html = experienceLetterTemplate(
+        commonTemplateData
+      );
+    } else if (
+      data.docType === "RELIEVING_LETTER"
+    ) {
+      html = relievingLetterTemplate({
+        ...commonTemplateData,
+
+        resignationDate:
+          employee.resignationDate
+            ? formatDate(
+                employee.resignationDate
+              )
+            : "N/A"
+      });
+    } else {
+      html = offerLetterTemplate({
+        ...commonTemplateData,
+
+        basicSalary:
+          employee.basicSalary.toLocaleString(
+            "en-IN"
+          ),
+
+        hra:
+          employee.hra.toLocaleString(
+            "en-IN"
+          ),
+
+        allowances:
+          employee.allowances.toLocaleString(
+            "en-IN"
+          ),
+
+        deductions:
+          employee.deductions.toLocaleString(
+            "en-IN"
+          ),
+
+        totalSalary:
+          totalSalary.toLocaleString(
+            "en-IN"
+          )
+      });
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * 12. Generate PDF using Puppeteer
      * ---------------------------------------------------------
      */
 
     const pdfBuffer =
-      await generatePdfFromHtml(html);
+      await generatePdfFromHtml(
+        html
+      );
 
     /*
      * ---------------------------------------------------------
-     * 10. Upload PDF to Cloudinary
+     * 13. Upload PDF to Cloudinary
      * ---------------------------------------------------------
      */
 
@@ -260,7 +395,7 @@ export const createDocumentRecord = asyncHandler(
 
     /*
      * ---------------------------------------------------------
-     * 11. Save document metadata in PostgreSQL
+     * 14. Save document metadata
      * ---------------------------------------------------------
      */
 
@@ -303,18 +438,28 @@ export const createDocumentRecord = asyncHandler(
 
     /*
      * ---------------------------------------------------------
-     * 12. Return response
+     * 15. Response
      * ---------------------------------------------------------
      */
+
+    const documentName =
+      data.docType
+        .replaceAll("_", " ")
+        .toLowerCase()
+        .replace(
+          /\b\w/g,
+          (char) => char.toUpperCase()
+        );
 
     res.status(201).json({
       success: true,
 
       message:
-        "Experience letter generated successfully",
+        `${documentName} generated successfully`,
 
       data: {
-        id: document.id,
+        id:
+          document.id,
 
         docNumber:
           document.docNumber,
