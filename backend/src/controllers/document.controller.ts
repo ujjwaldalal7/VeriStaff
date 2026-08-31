@@ -9,7 +9,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { createSha256 } from "../utils/tokens.js";
 import { env } from "../config/env.js";
 import type { AuthRequest } from "../types/auth.js";
-
+import { getRequiredParam } from "../utils/requestParams.js";
 import { generatePdfFromHtml } from "../services/pdf.service.js";
 import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
 
@@ -31,6 +31,18 @@ const documentSchema = z.object({
     .record(z.string(), z.unknown())
     .default({})
 });
+
+const documentListQuerySchema = z.object({
+  docType: z.enum([
+    "OFFER_LETTER",
+    "PAYSLIP",
+    "RELIEVING_LETTER",
+    "EXPERIENCE_LETTER"
+  ]).optional(),
+
+  employeeId: z.string().uuid().optional()
+});
+
 
 const clearanceRequiredDocTypes = new Set([
   "RELIEVING_LETTER",
@@ -478,6 +490,196 @@ export const createDocumentRecord = asyncHandler(
         createdAt:
           document.createdAt
       }
+    });
+  }
+);
+
+
+
+export const getDocuments = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const query = documentListQuerySchema.parse(req.query);
+
+    const documents = await prisma.generatedDocument.findMany({
+      where: {
+        tenantId: auth.tenantId,
+
+        ...(query.docType
+          ? {
+              docType: query.docType
+            }
+          : {}),
+
+        ...(query.employeeId
+          ? {
+              employeeId: query.employeeId
+            }
+          : {})
+      },
+
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            department: true,
+            designation: true,
+            status: true
+          }
+        }
+      },
+
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    res.json({
+      success: true,
+      count: documents.length,
+      data: documents
+    });
+  }
+);
+
+export const getDocumentById = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const documentId = getRequiredParam(req, "id");
+
+    const document =
+      await prisma.generatedDocument.findFirst({
+        where: {
+          id: documentId,
+          tenantId: auth.tenantId
+        },
+
+        include: {
+          employee: {
+            select: {
+              id: true,
+              employeeCode: true,
+              firstName: true,
+              lastName: true,
+              department: true,
+              designation: true
+            }
+          },
+
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              logoUrl: true
+            }
+          }
+        }
+      });
+
+    if (!document) {
+      throw new ApiError(
+        404,
+        "Document not found"
+      );
+    }
+
+    res.json({
+      success: true,
+      data: document
+    });
+  }
+);
+
+export const getEmployeeDocuments = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const employeeId =getRequiredParam(req, "employeeId");
+
+    const employee =
+      await prisma.employee.findFirst({
+        where: {
+          id: employeeId,
+          tenantId: auth.tenantId
+        },
+
+        select: {
+          id: true,
+          employeeCode: true,
+          firstName: true,
+          lastName: true,
+          department: true,
+          designation: true,
+          status: true
+        }
+      });
+
+    if (!employee) {
+      throw new ApiError(
+        404,
+        "Employee not found"
+      );
+    }
+
+    const documents =
+      await prisma.generatedDocument.findMany({
+        where: {
+          employeeId: employee.id,
+          tenantId: auth.tenantId
+        },
+
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
+
+    res.json({
+      success: true,
+
+      data: {
+        employee,
+        documents
+      }
+    });
+  }
+);
+
+export const deleteDocument = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const documentId =getRequiredParam(req, "id");
+
+    const document =
+      await prisma.generatedDocument.findFirst({
+        where: {
+          id: documentId,
+          tenantId: auth.tenantId
+        }
+      });
+
+    if (!document) {
+      throw new ApiError(
+        404,
+        "Document not found"
+      );
+    }
+
+    await prisma.generatedDocument.delete({
+      where: {
+        id: document.id
+      }
+    });
+
+    res.json({
+      success: true,
+      message:
+        "Document deleted successfully"
     });
   }
 );

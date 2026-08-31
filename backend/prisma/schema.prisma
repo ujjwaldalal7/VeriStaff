@@ -42,98 +42,134 @@ enum ClearanceStatus {
 }
 
 model Tenant {
-  id                 String              @id @default(uuid())
-  name               String
-  domain             String              @unique
-  logoUrl            String?
-  watermarkUrl       String?
-  primaryColor       String              @default("#1E40AF")
-  secondaryColor     String              @default("#3B82F6")
-  footerAddress      String              @default("")
-  authorizedSignUrl  String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  users              User[]
-  employees          Employee[]
-  documents          GeneratedDocument[]
-  onboardingInvites  OnboardingInvite[]
+  id                String              @id @default(uuid())
+  name              String
+  domain            String              @unique
+  logoUrl           String?
+  watermarkUrl      String?
+  primaryColor      String              @default("#1E40AF")
+  secondaryColor    String              @default("#3B82F6")
+  footerAddress     String              @default("")
+  authorizedSignUrl String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  users             User[]
+  employees         Employee[]
+  documents         GeneratedDocument[]
+  onboardingInvites OnboardingInvite[]
 }
 
 model User {
-  id               String               @id @default(uuid())
-  tenantId         String
-  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email            String               @unique
-  passwordHash     String
-  role             Role                 @default(EMPLOYEE)
-  employee         Employee?
-  clearancesDone   DepartmentClearance[] @relation("ClearedBy")
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id             String                @id @default(uuid())
+  tenantId       String
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email          String                @unique
+  passwordHash   String
+  role           Role                  @default(EMPLOYEE)
+  employee       Employee?
+  clearancesDone DepartmentClearance[] @relation("ClearedBy")
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   @@index([tenantId])
 }
 
 model Employee {
-  id               String               @id @default(uuid())
-  tenantId         String
-  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId           String?              @unique
-  user             User?                @relation(fields: [userId], references: [id])
-  employeeCode     String
-  firstName        String
-  lastName         String
-  department       String
-  designation      String
-  joiningDate      DateTime
-  resignationDate  DateTime?
-  lastWorkingDay   DateTime?
-  status           EmployeeStatus       @default(INVITED)
-  basicSalary      Float                @default(0)
-  hra              Float                @default(0)
-  allowances       Float                @default(0)
-  deductions       Float                @default(0)
-  bankAccountNo    String?
-  bankIfsc         String?
-  panCard          String?
-  nationalIdUrl    String?
-  documents        GeneratedDocument[]
-  clearances       DepartmentClearance[]
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id              String                @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId          String?               @unique
+  user            User?                 @relation(fields: [userId], references: [id])
+  employeeCode    String
+  firstName       String
+  lastName        String
+  department      String
+  designation     String
+  joiningDate     DateTime
+  resignationDate DateTime?
+  lastWorkingDay  DateTime?
+  status          EmployeeStatus        @default(INVITED)
+  basicSalary     Float                 @default(0)
+  hra             Float                 @default(0)
+  allowances      Float                 @default(0)
+  deductions      Float                 @default(0)
+  bankAccountNo   String?
+  bankIfsc        String?
+  panCard         String?
+  nationalIdUrl   String?
+  documents       GeneratedDocument[]
+  clearances      DepartmentClearance[]
+  payslips        Payslip[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId])
   @@index([tenantId, status])
 }
 
+model Payslip {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  month Int
+  year  Int
+
+  basicSalary Decimal @db.Decimal(12, 2)
+  hra         Decimal @db.Decimal(12, 2)
+  allowances  Decimal @db.Decimal(12, 2)
+  deductions  Decimal @db.Decimal(12, 2)
+
+  grossSalary Decimal @db.Decimal(12, 2)
+  netSalary   Decimal @db.Decimal(12, 2)
+
+  generatedDocumentId String?            @unique
+  generatedDocument   GeneratedDocument? @relation(fields: [generatedDocumentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([year, month])
+}
+
 model OnboardingInvite {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email       String
-  token       String   @unique
-  expiresAt   DateTime
-  isUsed      Boolean  @default(false)
-  employeeId  String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email      String
+  token      String   @unique
+  expiresAt  DateTime
+  isUsed     Boolean  @default(false)
+  employeeId String?
+  createdAt  DateTime @default(now())
 
   @@index([tenantId, email])
   @@index([token])
 }
 
 model GeneratedDocument {
-  id               String    @id @default(uuid())
-  tenantId         String
-  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employeeId       String
-  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  docNumber        String    @unique
-  docType          DocType
-  verificationHash String    @unique
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  docNumber String  @unique
+  docType   DocType
+
+  verificationHash String  @unique
   pdfUrl           String?
   metadataJson     Json
-  createdAt        DateTime  @default(now())
+
+  payslip Payslip?
+
+  createdAt DateTime @default(now())
 
   @@index([tenantId])
   @@index([employeeId])
