@@ -5,7 +5,10 @@ import {
   getDocuments,
   getDocumentById,
   getEmployeeDocuments,
-  deleteDocument
+  getMyDocuments,
+  deleteDocument,
+  revokeDocument,
+  getDocumentDownload
 } from "../controllers/document.controller.js";
 
 import { authenticate } from "../middlewares/auth.js";
@@ -27,9 +30,6 @@ router.get(
 
 /*
  * Get all documents for one employee
- *
- * IMPORTANT:
- * This must come before "/:id"
  */
 router.get(
   "/employee/:employeeId",
@@ -38,6 +38,23 @@ router.get(
   getEmployeeDocuments
 );
 
+
+/*
+ * Get documents belonging to the logged-in employee
+ */
+router.get(
+  "/me",
+  authenticate,
+  authorize("EMPLOYEE"),
+  getMyDocuments
+);
+
+router.get(
+  "/:id/download",
+  authenticate,
+  authorize("SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"),
+  getDocumentDownload
+);
 
 /*
  * Get one document
@@ -51,7 +68,7 @@ router.get(
 
 
 /*
- * Create Experience/Relieving Letter
+ * Create document
  */
 router.post(
   "/",
@@ -71,5 +88,11 @@ router.delete(
   deleteDocument
 );
 
+router.patch(
+  "/:id/revoke",
+  authenticate,
+  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  revokeDocument
+);
 
 export default router;

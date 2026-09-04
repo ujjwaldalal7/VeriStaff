@@ -10,6 +10,7 @@ import { createSha256 } from "../utils/tokens.js";
 import { env } from "../config/env.js";
 import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
+import {ensureEmployeeAccess} from "../utils/employeeAccess.js";
 import { generatePdfFromHtml } from "../services/pdf.service.js";
 import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
 
@@ -680,6 +681,191 @@ export const deleteDocument = asyncHandler(
       success: true,
       message:
         "Document deleted successfully"
+    });
+  }
+);
+
+
+
+export const getMyDocuments = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: auth.userId
+      },
+      select: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            department: true,
+            designation: true
+          }
+        }
+      }
+    });
+
+    if (!user?.employee) {
+      throw new ApiError(
+        404,
+        "Employee profile not found"
+      );
+    }
+
+    const documents =
+      await prisma.generatedDocument.findMany({
+        where: {
+          employeeId: user.employee.id,
+          tenantId: auth.tenantId
+        },
+        select: {
+          id: true,
+          docNumber: true,
+          docType: true,
+          verificationHash: true,
+          pdfUrl: true,
+          createdAt: true
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
+
+    res.json({
+      success: true,
+      data: {
+        employee: user.employee,
+        documents
+      }
+    });
+  }
+);
+
+
+export const revokeDocument = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user;
+
+    if (!auth) {
+      throw new ApiError(
+        401,
+        "Authentication required"
+      );
+    }
+
+    const documentId = getRequiredParam(
+      req,
+      "id"
+    );
+
+    const document =
+      await prisma.generatedDocument.findFirst({
+        where: {
+          id: documentId,
+          tenantId: auth.tenantId
+        }
+      });
+
+    if (!document) {
+      throw new ApiError(
+        404,
+        "Document not found"
+      );
+    }
+
+    if (document.status === "REVOKED") {
+      throw new ApiError(
+        400,
+        "Document is already revoked"
+      );
+    }
+
+    const revokedDocument =
+      await prisma.generatedDocument.update({
+        where: {
+          id: document.id
+        },
+        data: {
+          status: "REVOKED",
+          revokedAt: new Date(),
+          revokedById: auth.userId
+        },
+        select: {
+          id: true,
+          docNumber: true,
+          docType: true,
+          status: true,
+          revokedAt: true,
+          revokedById: true
+        }
+      });
+
+    res.json({
+      success: true,
+      message: "Document revoked successfully",
+      data: revokedDocument
+    });
+  }
+);
+
+
+export const getDocumentDownload = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user;
+
+    if (!auth) {
+      throw new ApiError(401, "Authentication required");
+    }
+
+    const documentId = getRequiredParam(req, "id");
+
+    const document = await prisma.generatedDocument.findFirst({
+      where: {
+        id: documentId,
+        tenantId: auth.tenantId
+      },
+      select: {
+        id: true,
+        docNumber: true,
+        docType: true,
+        status: true,
+        pdfUrl: true,
+        employee: {
+          select: {
+            id: true,
+            tenantId: true,
+            userId: true
+          }
+        }
+      }
+    });
+
+    if (!document) {
+      throw new ApiError(404, "Document not found");
+    }
+
+    ensureEmployeeAccess(document.employee, auth);
+
+    if (!document.pdfUrl) {
+      throw new ApiError(
+        404,
+        "PDF file is not available for this document"
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: document.id,
+        docNumber: document.docNumber,
+        docType: document.docType,
+        status: document.status,
+        downloadUrl: document.pdfUrl
+      }
     });
   }
 );

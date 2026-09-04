@@ -52,25 +52,14 @@ export const verifyDocument = asyncHandler(
       success: true,
 
       data: {
-        status: "VALID",
-
-        documentNumber:
-          document.docNumber,
-
-        documentType:
-          document.docType,
-
-        verificationHash:
-          document.verificationHash,
-
-        issuedAt:
-          document.createdAt,
-
-        company:
-          document.tenant,
-
-        employee:
-          document.employee
+        status: document.status,
+        documentNumber:  document.docNumber,
+        documentType:  document.docType,
+        verificationHash:  document.verificationHash,
+        issuedAt:  document.createdAt,
+        revokedAt: document.revokedAt,
+        company:  document.tenant,
+        employee:  document.employee
       }
     });
   }
