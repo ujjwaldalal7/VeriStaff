@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import crypto from "node:crypto";
 import { z } from "zod";
 import QRCode from "qrcode";
-
+import { Readable } from "node:stream";
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -857,15 +857,42 @@ export const getDocumentDownload = asyncHandler(
       );
     }
 
-    res.json({
-      success: true,
-      data: {
-        id: document.id,
-        docNumber: document.docNumber,
-        docType: document.docType,
-        status: document.status,
-        downloadUrl: document.pdfUrl
-      }
-    });
+    let pdfResponse: globalThis.Response;
+
+    try {
+      pdfResponse = await fetch(document.pdfUrl);
+    } catch {
+      throw new ApiError(
+        502,
+        "Unable to retrieve the document file"
+      );
+    }
+
+    if (!pdfResponse.ok || !pdfResponse.body) {
+      throw new ApiError(
+        502,
+        "Unable to retrieve the document file"
+      );
+    }
+
+    const filename = `${document.docNumber}.pdf`;
+
+    res.status(200);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`
+    );
+
+    if (pdfResponse.headers.get("content-length")) {
+      res.setHeader(
+        "Content-Length",
+        pdfResponse.headers.get("content-length")!
+      );
+    }
+
+    Readable.fromWeb(
+      pdfResponse.body as import("node:stream/web").ReadableStream
+    ).pipe(res);
   }
 );
