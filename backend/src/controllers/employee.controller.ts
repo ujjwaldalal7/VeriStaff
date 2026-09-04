@@ -6,6 +6,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
 import { ensureEmployeeAccess } from "../utils/employeeAccess.js";
+import type { EmployeeStatus } from "../generated/prisma/client.js";
 
 const createEmployeeSchema = z.object({
   employeeCode: z.string().min(1).max(30),
@@ -22,6 +23,74 @@ const createEmployeeSchema = z.object({
 });
 
 const updateEmployeeSchema = createEmployeeSchema.partial();
+
+const updateMyProfileSchema = z.object({
+  firstName: z.string().trim().min(1).max(50).optional(),
+  lastName: z.string().trim().min(1).max(50).optional(),
+
+  bankAccountNo: z
+    .string()
+    .trim()
+    .min(4)
+    .max(30)
+    .optional()
+    .nullable(),
+
+  bankIfsc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/)
+    .optional()
+    .nullable(),
+
+  panCard: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/)
+    .optional()
+    .nullable()
+});
+
+const employeeListQuerySchema = z.object({
+  search: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional(),
+
+  status: z
+    .enum([
+      "INVITED",
+      "ONBOARDING",
+      "ACTIVE",
+      "RESIGNED",
+      "OFFBOARDED"
+    ])
+    .optional(),
+
+  department: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional(),
+
+  page: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(1),
+
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(10)
+});
 
 export const createEmployee = asyncHandler(async (req: Request, res: Response) => {
   const auth = (req as AuthRequest).user!;
@@ -72,34 +141,122 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
   });
 });
 
-export const listEmployees = asyncHandler(async (req: Request, res: Response) => {
-  const auth = (req as AuthRequest).user!;
-  const status = req.query.status as string | undefined;
-  const search = req.query.search as string | undefined;
+export const listEmployees = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
 
-  const employees = await prisma.employee.findMany({
-    where: {
+    const parsed = employeeListQuerySchema.safeParse(
+      req.query
+    );
+
+    if (!parsed.success) {
+      throw new ApiError(
+        400,
+        parsed.error.issues[0]?.message ??
+          "Invalid query parameters"
+      );
+    }
+
+    const {
+      search,
+      status,
+      department,
+      page,
+      limit
+    } = parsed.data;
+
+    const skip = (page - 1) * limit;
+
+    const where = {
       tenantId: auth.tenantId,
-      ...(status ? { status: status as any } : {}),
+
+      ...(status
+        ? {
+            status: status as EmployeeStatus
+          }
+        : {}),
+
+      ...(department
+        ? {
+            department: {
+              equals: department,
+              mode: "insensitive" as const
+            }
+          }
+        : {}),
+
       ...(search
         ? {
             OR: [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
-              { employeeCode: { contains: search, mode: "insensitive" } },
-              { department: { contains: search, mode: "insensitive" } }
+              {
+                firstName: {
+                  contains: search,
+                  mode: "insensitive" as const
+                }
+              },
+              {
+                lastName: {
+                  contains: search,
+                  mode: "insensitive" as const
+                }
+              },
+              {
+                employeeCode: {
+                  contains: search,
+                  mode: "insensitive" as const
+                }
+              },
+              {
+                department: {
+                  contains: search,
+                  mode: "insensitive" as const
+                }
+              },
+              {
+                designation: {
+                  contains: search,
+                  mode: "insensitive" as const
+                }
+              }
             ]
           }
         : {})
-    },
-    orderBy: { createdAt: "desc" }
-  });
+    };
 
-  res.json({
-    success: true,
-    data: employees
-  });
-});
+    const [employees, total] =
+      await prisma.$transaction([
+        prisma.employee.findMany({
+          where,
+          orderBy: {
+            createdAt: "desc"
+          },
+          skip,
+          take: limit
+        }),
+
+        prisma.employee.count({
+          where
+        })
+      ]);
+
+    const totalPages = Math.ceil(
+      total / limit
+    );
+
+    res.json({
+      success: true,
+      data: employees,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
+    });
+  }
+);
 
 export const getEmployee = asyncHandler(async (req: Request, res: Response) => {
   const auth = (req as AuthRequest).user!;
@@ -212,3 +369,104 @@ export const resignEmployee = asyncHandler(async (req: Request, res: Response) =
     data: updated
   });
 });
+
+export const getMyProfile = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const employee = await prisma.employee.findFirst({
+      where: {
+        userId: auth.userId,
+        tenantId: auth.tenantId
+      },
+      select: {
+        id: true,
+        employeeCode: true,
+        firstName: true,
+        lastName: true,
+        department: true,
+        designation: true,
+        joiningDate: true,
+        resignationDate: true,
+        lastWorkingDay: true,
+        status: true,
+        bankAccountNo: true,
+        bankIfsc: true,
+        panCard: true,
+        nationalIdUrl: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true
+          }
+        }
+      }
+    });
+
+    if (!employee) {
+      throw new ApiError(
+        404,
+        "Employee profile not found"
+      );
+    }
+
+    res.json({
+      success: true,
+      data: employee
+    });
+  }
+);
+
+
+export const updateMyProfile = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const data = updateMyProfileSchema.parse(req.body);
+
+    const employee = await prisma.employee.findFirst({
+      where: {
+        userId: auth.userId,
+        tenantId: auth.tenantId
+      }
+    });
+
+    if (!employee) {
+      throw new ApiError(
+        404,
+        "Employee profile not found"
+      );
+    }
+
+    const updated = await prisma.employee.update({
+      where: {
+        id: employee.id
+      },
+      data
+    });
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: {
+        id: updated.id,
+        employeeCode: updated.employeeCode,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        department: updated.department,
+        designation: updated.designation,
+        joiningDate: updated.joiningDate,
+        status: updated.status,
+        bankAccountNo: updated.bankAccountNo,
+        bankIfsc: updated.bankIfsc,
+        panCard: updated.panCard,
+        nationalIdUrl: updated.nationalIdUrl,
+        updatedAt: updated.updatedAt
+      }
+    });
+  }
+);
