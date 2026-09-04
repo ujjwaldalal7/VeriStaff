@@ -7,7 +7,7 @@ import clearanceRoutes from "./clearance.routes.js";
 import documentRoutes from "./document.routes.js";
 import verificationRoutes from "./verification.routes.js";
 import payslipRoutes from "./payslip.routes.js";
-import { app } from "../app.js";
+import passwordRoutes from "./password.routes.js";
 
 const router = Router();
 
@@ -19,5 +19,6 @@ router.use("/clearances", clearanceRoutes);
 router.use("/documents", documentRoutes);
 router.use("/verify-doc", verificationRoutes);
 router.use("/payslips", payslipRoutes);
+router.use("/password",passwordRoutes);
 
 export default router;
