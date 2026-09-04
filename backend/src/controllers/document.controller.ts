@@ -13,7 +13,7 @@ import { getRequiredParam } from "../utils/requestParams.js";
 import {ensureEmployeeAccess} from "../utils/employeeAccess.js";
 import { generatePdfFromHtml } from "../services/pdf.service.js";
 import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
-
+import { createAuditLog } from "../utils/auditLog.js";
 import { experienceLetterTemplate } from "../templates/experienceLetter.template.js";
 import { relievingLetterTemplate } from "../templates/relievingLetter.template.js";
 import { offerLetterTemplate } from "../templates/offerLetter.template.js";
@@ -804,6 +804,20 @@ export const revokeDocument = asyncHandler(
         }
       });
 
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "DOCUMENT_REVOKE",
+      entityType: "GeneratedDocument",
+      entityId: document.id,
+      metadata: {
+        docNumber: document.docNumber,
+        docType: document.docType
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
+
     res.json({
       success: true,
       message: "Document revoked successfully",
@@ -857,6 +871,21 @@ export const getDocumentDownload = asyncHandler(
       );
     }
 
+
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "DOCUMENT_DOWNLOAD",
+      entityType: "GeneratedDocument",
+      entityId: document.id,
+      metadata: {
+        docNumber: document.docNumber,
+        docType: document.docType,
+        documentStatus: document.status
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
     let pdfResponse: globalThis.Response;
 
     try {

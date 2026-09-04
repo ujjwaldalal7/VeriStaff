@@ -8,6 +8,7 @@ import documentRoutes from "./document.routes.js";
 import verificationRoutes from "./verification.routes.js";
 import payslipRoutes from "./payslip.routes.js";
 import passwordRoutes from "./password.routes.js";
+import auditRoutes from "./audit.routes.js";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use("/documents", documentRoutes);
 router.use("/verify-doc", verificationRoutes);
 router.use("/payslips", payslipRoutes);
 router.use("/password",passwordRoutes);
+router.use("/audit-logs", auditRoutes);
 
 export default router;

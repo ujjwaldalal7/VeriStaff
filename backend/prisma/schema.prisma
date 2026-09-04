@@ -46,6 +46,20 @@ enum DocumentStatus {
   REVOKED
 }
 
+enum AuditAction {
+  LOGIN
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  EMPLOYEE_CREATE
+  EMPLOYEE_UPDATE
+  EMPLOYEE_RESIGN
+  CLEARANCE_UPDATE
+  DOCUMENT_CREATE
+  DOCUMENT_DOWNLOAD
+  DOCUMENT_REVOKE
+  DOCUMENT_DELETE
+}
+
 model Tenant {
   id                String              @id @default(uuid())
   name              String
@@ -62,6 +76,7 @@ model Tenant {
   employees         Employee[]
   documents         GeneratedDocument[]
   onboardingInvites OnboardingInvite[]
+  auditLogs AuditLog[]
 }
 
 model User {
@@ -73,6 +88,7 @@ model User {
   role           Role                  @default(EMPLOYEE)
   employee       Employee?
   clearancesDone DepartmentClearance[] @relation("ClearedBy")
+  auditLogs AuditLog[]
   revokedDocuments GeneratedDocument[] @relation("RevokedBy")
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
@@ -201,4 +217,32 @@ model DepartmentClearance {
 
   @@unique([employeeId, department])
   @@index([employeeId])
+}
+
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  action AuditAction
+
+  entityType String
+  entityId   String?
+
+  metadata Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@index([entityType, entityId])
+  @@index([actorId])
 }
