@@ -7,21 +7,54 @@ import {
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AppShell from "./layouts/AppShell";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-
+        {/* Public */}
         <Route
-          path="/dashboard"
-          element={<Dashboard />}
+          path="/login"
+          element={<Login />}
+        />
+
+        {/* Protected application */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Navigate
+                  to="/dashboard"
+                  replace
+                />
+              </AppShell>
+            </ProtectedRoute>
+          }
         />
 
         <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Dashboard />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Fallback */}
+        <Route
           path="*"
-          element={<Navigate to="/login" replace />}
+          element={
+            <Navigate
+              to="/dashboard"
+              replace
+            />
+          }
         />
       </Routes>
     </BrowserRouter>

@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { login } from "../store/slices/authSlice";
+import Logo from "../components/ui/Logo";
 
 export default function Login() {
   const dispatch = useAppDispatch();
@@ -37,9 +38,13 @@ export default function Login() {
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
 
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-white">
-            VeriStaff
-          </h1>
+          <div className="mb-8 flex justify-center">
+            <Logo
+              variant="full"
+              size="lg"
+              linkTo=""
+            />
+          </div>
 
           <p className="mt-2 text-sm text-slate-400">
             HR Operations & Document Verification
