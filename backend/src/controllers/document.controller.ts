@@ -12,7 +12,10 @@ import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
 import {ensureEmployeeAccess} from "../utils/employeeAccess.js";
 import { generatePdfFromHtml } from "../services/pdf.service.js";
-import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
+import {
+  deletePdfFromCloudinary,
+  uploadPdfToCloudinary
+} from "../services/cloudinary.service.js";
 import { createAuditLog } from "../utils/auditLog.js";
 import { experienceLetterTemplate } from "../templates/experienceLetter.template.js";
 import { relievingLetterTemplate } from "../templates/relievingLetter.template.js";
@@ -238,7 +241,7 @@ export const createDocumentRecord = asyncHandler(
      */
 
     const verificationUrl =
-      `${env.PUBLIC_API_URL}/verify-doc/${verificationHash}`;
+      `${env.PUBLIC_APP_URL}/verify-doc/${verificationHash}`;
 
     /*
      * ---------------------------------------------------------
@@ -266,10 +269,10 @@ export const createDocumentRecord = asyncHandler(
       `${employee.firstName} ${employee.lastName}`;
 
     const totalSalary =
-      employee.basicSalary +
-      employee.hra +
-      employee.allowances -
-      employee.deductions;
+      Number(employee.basicSalary) +
+      Number(employee.hra) +
+      Number(employee.allowances) -
+      Number(employee.deductions);
 
     const commonTemplateData = {
       companyName:
@@ -357,22 +360,22 @@ export const createDocumentRecord = asyncHandler(
         ...commonTemplateData,
 
         basicSalary:
-          employee.basicSalary.toLocaleString(
+          Number(employee.basicSalary).toLocaleString(
             "en-IN"
           ),
 
         hra:
-          employee.hra.toLocaleString(
+          Number(employee.hra).toLocaleString(
             "en-IN"
           ),
 
         allowances:
-          employee.allowances.toLocaleString(
+          Number(employee.allowances).toLocaleString(
             "en-IN"
           ),
 
         deductions:
-          employee.deductions.toLocaleString(
+          Number(employee.deductions).toLocaleString(
             "en-IN"
           ),
 
@@ -412,8 +415,9 @@ export const createDocumentRecord = asyncHandler(
      * ---------------------------------------------------------
      */
 
-    const document =
-      await prisma.generatedDocument.create({
+    let document;
+    try {
+      document = await prisma.generatedDocument.create({
         data: {
           tenantId:
             employee.tenantId,
@@ -448,6 +452,10 @@ export const createDocumentRecord = asyncHandler(
           }
         }
       });
+    } catch (error) {
+      await deletePdfFromCloudinary(pdfUrl);
+      throw error;
+    }
 
     await createAuditLog({
       tenantId: auth.tenantId,
@@ -500,9 +508,6 @@ export const createDocumentRecord = asyncHandler(
           document.verificationHash,
 
         verificationUrl,
-
-        pdfUrl:
-          document.pdfUrl,
 
         createdAt:
           document.createdAt
@@ -558,7 +563,7 @@ export const getDocuments = asyncHandler(
     res.json({
       success: true,
       count: documents.length,
-      data: documents
+      data: documents.map(({ pdfUrl: _pdfUrl, ...document }) => document)
     });
   }
 );
@@ -607,7 +612,7 @@ export const getDocumentById = asyncHandler(
 
     res.json({
       success: true,
-      data: document
+      data: (({ pdfUrl: _pdfUrl, ...document }) => document)(document)
     });
   }
 );
@@ -660,7 +665,7 @@ export const getEmployeeDocuments = asyncHandler(
 
       data: {
         employee,
-        documents
+        documents: documents.map(({ pdfUrl: _pdfUrl, ...document }) => document)
       }
     });
   }
@@ -692,6 +697,10 @@ export const deleteDocument = asyncHandler(
         id: document.id
       }
     });
+
+    if (document.pdfUrl) {
+      await deletePdfFromCloudinary(document.pdfUrl);
+    }
 
     await createAuditLog({
       tenantId: auth.tenantId,
@@ -757,7 +766,6 @@ export const getMyDocuments = asyncHandler(
           docNumber: true,
           docType: true,
           verificationHash: true,
-          pdfUrl: true,
           status: true,
           revokedAt: true,
           createdAt: true
@@ -859,8 +867,11 @@ export const revokeDocument = asyncHandler(
 );
 
 
-export const getDocumentDownload = asyncHandler(
-  async (req: Request, res: Response) => {
+const streamDocument = async (
+  req: Request,
+  res: Response,
+  disposition: "attachment" | "inline"
+) => {
     const auth = (req as AuthRequest).user;
 
     if (!auth) {
@@ -901,7 +912,7 @@ export const getDocumentDownload = asyncHandler(
     if (document.status === "REVOKED") {
       throw new ApiError(
         403,
-        "This document has been revoked and is no longer available for download"
+        "This document has been revoked and is no longer available"
       );
     }
 
@@ -951,7 +962,7 @@ export const getDocumentDownload = asyncHandler(
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${filename}"`
+      `${disposition}; filename="${filename}"`
     );
 
     if (pdfResponse.headers.get("content-length")) {
@@ -964,5 +975,16 @@ export const getDocumentDownload = asyncHandler(
     Readable.fromWeb(
       pdfResponse.body as import("node:stream/web").ReadableStream
     ).pipe(res);
+  };
+
+export const getDocumentDownload = asyncHandler(
+  async (req: Request, res: Response) => {
+    await streamDocument(req, res, "attachment");
+  }
+);
+
+export const getDocumentView = asyncHandler(
+  async (req: Request, res: Response) => {
+    await streamDocument(req, res, "inline");
   }
 );

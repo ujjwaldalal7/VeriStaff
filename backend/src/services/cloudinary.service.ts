@@ -75,3 +75,25 @@ export const uploadImageToCloudinary = async (
       .pipe(uploadStream);
   });
 };
+
+export const deletePdfFromCloudinary = async (
+  pdfUrl: string
+): Promise<void> => {
+  try {
+    const url = new URL(pdfUrl);
+    const match = url.pathname.match(
+      /\/veristaff\/documents\/(.+?)\.pdf$/
+    );
+
+    if (!match) {
+      return;
+    }
+
+    await cloudinary.uploader.destroy(
+      `veristaff/documents/${match[1]}`,
+      { resource_type: "raw" }
+    );
+  } catch {
+    // A legacy URL or storage failure must not prevent record cleanup.
+  }
+};

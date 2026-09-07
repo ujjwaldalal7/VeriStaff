@@ -4,6 +4,10 @@ export interface CreatePayslipRequest {
   employeeId: string;
   month: number;
   year: number;
+  basicSalary: number;
+  hra: number;
+  allowances: number;
+  deductions: number;
 }
 
 export const getPayslips = async () => {

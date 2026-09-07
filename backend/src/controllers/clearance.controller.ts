@@ -14,7 +14,7 @@ const resignationSchema = z.object({
 });
 
 const clearanceUpdateSchema = z.object({
-  status: z.enum(["APPROVED", "REJECTED"]),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
   remarks: z.string().trim().max(500).optional()
 });
 
@@ -62,17 +62,14 @@ export const submitResignation = asyncHandler(
       throw new ApiError(404, "Employee not found");
     }
 
-    if (employee.status === "OFFBOARDED") {
-      throw new ApiError(
-        400,
-        "Employee has already been offboarded"
-      );
+    if (employee.status !== "ACTIVE") {
+      throw new ApiError(400, "Only active employees can start offboarding");
     }
 
-    if (employee.status === "RESIGNED") {
+    if (data.resignationDate < employee.joiningDate) {
       throw new ApiError(
         400,
-        "Resignation has already been submitted"
+        "Resignation date cannot be before joining date"
       );
     }
 
@@ -232,6 +229,10 @@ export const updateClearance = asyncHandler(
 
     const data = clearanceUpdateSchema.parse(req.body);
 
+    if (data.status === "REJECTED" && !data.remarks) {
+      throw new ApiError(400, "Remarks are required when rejecting a clearance");
+    }
+
     // Only HR and Super Admin can update clearances.
     if (
       auth.role !== "SUPER_ADMIN" &&
@@ -290,6 +291,10 @@ export const updateClearance = asyncHandler(
           );
         }
 
+        if (data.status === "PENDING" && clearance.status !== "REJECTED") {
+          throw new ApiError(400, "Only a rejected clearance can be returned to pending");
+        }
+
         const updatedClearance =
           await tx.departmentClearance.update({
             where: {
@@ -298,8 +303,8 @@ export const updateClearance = asyncHandler(
             data: {
               status: data.status,
               remarks: data.remarks,
-              clearedById: auth.userId,
-              clearedAt: new Date()
+              clearedById: data.status === "PENDING" ? null : auth.userId,
+              clearedAt: data.status === "PENDING" ? null : new Date()
             },
             include: {
               clearedBy: {

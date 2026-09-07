@@ -8,7 +8,8 @@ import {
   getMyDocuments,
   deleteDocument,
   revokeDocument,
-  getDocumentDownload
+  getDocumentDownload,
+  getDocumentView
 } from "../controllers/document.controller.js";
 
 import { authenticate } from "../middlewares/auth.js";
@@ -54,6 +55,13 @@ router.get(
   authenticate,
   authorize("SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"),
   getDocumentDownload
+);
+
+router.get(
+  "/:id/view",
+  authenticate,
+  authorize("SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"),
+  getDocumentView
 );
 
 /*

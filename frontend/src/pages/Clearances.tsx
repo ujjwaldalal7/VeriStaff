@@ -9,6 +9,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Select from "../components/ui/Select";
+import Input from "../components/ui/Input";
 import {
   getClearanceStatus,
   updateClearance
@@ -40,6 +41,8 @@ export default function Clearances() {
     useState<string | null>(null);
   const [message, setMessage] =
     useState<string | null>(null);
+  const [rejectingDepartment, setRejectingDepartment] = useState<Clearance["department"] | null>(null);
+  const [remarks, setRemarks] = useState("");
 
   const loadEmployees = async () => {
     try {
@@ -95,7 +98,7 @@ export default function Clearances() {
 
   const handleUpdate = async (
     department: Clearance["department"],
-    status: "APPROVED" | "REJECTED"
+    status: "PENDING" | "APPROVED" | "REJECTED"
   ) => {
     if (!employeeId) {
       return;
@@ -107,9 +110,12 @@ export default function Clearances() {
       setMessage(null);
 
       await updateClearance(employeeId, department, {
-        status
+        status,
+        remarks: status === "REJECTED" ? remarks.trim() : undefined
       });
       setMessage(`Clearance ${status.toLowerCase()}.`);
+      setRejectingDepartment(null);
+      setRemarks("");
       await loadClearances(employeeId);
       await loadEmployees();
     } catch (err: unknown) {
@@ -223,18 +229,29 @@ export default function Clearances() {
                 <Button
                   size="sm"
                   variant="danger"
-                  onClick={() =>
-                    void handleUpdate(
-                      clearance.department,
-                      "REJECTED"
-                    )
-                  }
+                  onClick={() => {
+                    setRejectingDepartment(clearance.department);
+                    setRemarks(clearance.remarks || "");
+                  }}
                   disabled={working === clearance.department}
                 >
                   <X size={15} />
                   Reject
                 </Button>
+                {clearance.status === "REJECTED" && (
+                  <Button size="sm" variant="secondary" onClick={() => void handleUpdate(clearance.department, "PENDING")} disabled={working === clearance.department}>
+                    <RefreshCw size={15} />
+                    Reopen
+                  </Button>
+                )}
               </div>
+
+              {rejectingDepartment === clearance.department && (
+                <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <Input label="Rejection Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} required />
+                  <div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setRejectingDepartment(null)}>Cancel</Button><Button size="sm" variant="danger" onClick={() => void handleUpdate(clearance.department, "REJECTED")} disabled={!remarks.trim() || working === clearance.department}>Confirm Rejection</Button></div>
+                </div>
+              )}
             </Card>
           ))}
         </div>

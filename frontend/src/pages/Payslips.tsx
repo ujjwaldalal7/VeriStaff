@@ -1,4 +1,6 @@
 import {
+  Download,
+  Eye,
   FilePlus2,
   RefreshCw
 } from "lucide-react";
@@ -15,6 +17,11 @@ import {
   getMyPayslips,
   getPayslips
 } from "../services/payslipApi";
+import {
+  downloadDocument,
+  revokeDocument,
+  viewDocument
+} from "../services/documentApi";
 import { getEmployees } from "../services/employeeApi";
 import type { Employee } from "../types/employee";
 import { useAppSelector } from "../hooks/redux";
@@ -80,6 +87,10 @@ export default function Payslips() {
   const [year, setYear] = useState(
     String(new Date().getFullYear())
   );
+  const [basicSalary, setBasicSalary] = useState("0");
+  const [hra, setHra] = useState("0");
+  const [allowances, setAllowances] = useState("0");
+  const [deductions, setDeductions] = useState("0");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] =
     useState<string | null>(null);
@@ -130,6 +141,16 @@ export default function Payslips() {
     void loadPayslips();
   }, [isAdmin]);
 
+  const handleEmployeeChange = (id: string) => {
+    setEmployeeId(id);
+    const employee = employees.find((item) => item.id === id);
+    if (!employee) return;
+    setBasicSalary(String(employee.basicSalary ?? 0));
+    setHra(String(employee.hra ?? 0));
+    setAllowances(String(employee.allowances ?? 0));
+    setDeductions(String(employee.deductions ?? 0));
+  };
+
   const handleCreate = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -147,7 +168,11 @@ export default function Payslips() {
       await createPayslip({
         employeeId,
         month: Number(month),
-        year: Number(year)
+        year: Number(year),
+        basicSalary: Number(basicSalary),
+        hra: Number(hra),
+        allowances: Number(allowances),
+        deductions: Number(deductions)
       });
       setMessage("Payslip created.");
       await loadPayslips();
@@ -158,6 +183,33 @@ export default function Payslips() {
           "Unable to create payslip."
         )
       );
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleDocument = async (
+    documentId: string,
+    action: "view" | "download"
+  ) => {
+    try {
+      setWorking(documentId);
+      const blob = action === "view"
+        ? await viewDocument(documentId)
+        : await downloadDocument(documentId);
+      const url = URL.createObjectURL(blob);
+      if (action === "view") {
+        window.open(url, "_blank", "noopener,noreferrer");
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "payslip.pdf";
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Unable to access payslip document."));
     } finally {
       setWorking(null);
     }
@@ -223,13 +275,13 @@ export default function Payslips() {
           <Card className="mb-6 p-5">
             <form
               onSubmit={handleCreate}
-              className="grid gap-4 lg:grid-cols-[1fr_160px_160px_auto]"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
             >
               <Select
                 label="Employee"
                 value={employeeId}
                 onChange={(event) =>
-                  setEmployeeId(event.target.value)
+                  handleEmployeeChange(event.target.value)
                 }
               >
                 <option value="">Select employee</option>
@@ -270,6 +322,11 @@ export default function Payslips() {
                   setYear(event.target.value)
                 }
               />
+
+              <Input label="Basic Salary" type="number" min={0} step="0.01" value={basicSalary} onChange={(event) => setBasicSalary(event.target.value)} required />
+              <Input label="HRA" type="number" min={0} step="0.01" value={hra} onChange={(event) => setHra(event.target.value)} required />
+              <Input label="Allowances" type="number" min={0} step="0.01" value={allowances} onChange={(event) => setAllowances(event.target.value)} required />
+              <Input label="Deductions" type="number" min={0} step="0.01" value={deductions} onChange={(event) => setDeductions(event.target.value)} required />
 
               <div className="flex items-end">
                 <Button
@@ -349,9 +406,13 @@ export default function Payslips() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         {payslip.generatedDocument ? (
-                          <span className="text-sm text-slate-600 dark:text-slate-300">
-                            {payslip.generatedDocument.docNumber}
-                          </span>
+                          <div className="flex justify-end gap-2">
+                            <span className="text-sm text-slate-600 dark:text-slate-300">{payslip.generatedDocument.docNumber}</span>
+                            {payslip.generatedDocument.status === "VALID" && <Button size="sm" variant="secondary" onClick={() => void handleDocument(payslip.generatedDocument!.id, "view")} disabled={working === payslip.generatedDocument.id}><Eye size={15} />View</Button>}
+                            {payslip.generatedDocument.status === "VALID" && <Button size="sm" variant="secondary" onClick={() => void handleDocument(payslip.generatedDocument!.id, "download")} disabled={working === payslip.generatedDocument.id}><Download size={15} />Download</Button>}
+                            <a href={`/verify-doc/${payslip.generatedDocument.verificationHash}`} target="_blank" rel="noreferrer"><Button size="sm" variant="secondary">Verify</Button></a>
+                            {isAdmin && payslip.generatedDocument.status === "VALID" && <Button size="sm" variant="danger" onClick={() => void revokeDocument(payslip.generatedDocument!.id).then(loadPayslips)}>Revoke</Button>}
+                          </div>
                         ) : isAdmin ? (
                           <Button
                             size="sm"

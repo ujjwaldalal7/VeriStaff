@@ -13,7 +13,10 @@ import { createSha256 } from "../utils/tokens.js";
 import { env } from "../config/env.js";
 
 import { generatePdfFromHtml } from "../services/pdf.service.js";
-import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
+import {
+  deletePdfFromCloudinary,
+  uploadPdfToCloudinary
+} from "../services/cloudinary.service.js";
 
 import { payslipTemplate } from "../templates/payslip.template.js";
 
@@ -83,7 +86,11 @@ const createPayslipSchema = z.object({
     .number()
     .int()
     .min(2000)
-    .max(2100)
+    .max(2100),
+  basicSalary: z.number().nonnegative(),
+  hra: z.number().nonnegative(),
+  allowances: z.number().nonnegative(),
+  deductions: z.number().nonnegative()
 });
 
 export const listPayslips = asyncHandler(
@@ -113,7 +120,6 @@ export const listPayslips = asyncHandler(
             id: true,
             docNumber: true,
             status: true,
-            pdfUrl: true,
             verificationHash: true,
             createdAt: true
           }
@@ -173,7 +179,6 @@ export const getMyPayslips = asyncHandler(
             id: true,
             docNumber: true,
             status: true,
-            pdfUrl: true,
             verificationHash: true,
             createdAt: true
           }
@@ -281,17 +286,7 @@ export const createPayslip = asyncHandler(
      * ---------------------------------------------------------
      */
 
-    const basicSalary =
-      employee.basicSalary;
-
-    const hra =
-      employee.hra;
-
-    const allowances =
-      employee.allowances;
-
-    const deductions =
-      employee.deductions;
+    const { basicSalary, hra, allowances, deductions } = data;
 
     const grossSalary =
       basicSalary +
@@ -475,7 +470,7 @@ export const generatePayslipDocument = asyncHandler(
       createSha256(hashPayload);
 
     const verificationUrl =
-      `${env.PUBLIC_API_URL}/verify-doc/${verificationHash}`;
+      `${env.PUBLIC_APP_URL}/verify-doc/${verificationHash}`;
 
     /*
      * QR
@@ -588,8 +583,9 @@ export const generatePayslipDocument = asyncHandler(
      * Transaction ensures both DB operations succeed together.
      */
 
-    const result =
-      await prisma.$transaction(
+    let result;
+    try {
+      result = await prisma.$transaction(
         async (tx) => {
           const document =
             await tx.generatedDocument.create({
@@ -653,6 +649,10 @@ export const generatePayslipDocument = asyncHandler(
           };
         }
       );
+    } catch (error) {
+      await deletePdfFromCloudinary(pdfUrl);
+      throw error;
+    }
 
     await createAuditLog({
       tenantId: auth.tenantId,
@@ -699,9 +699,6 @@ export const generatePayslipDocument = asyncHandler(
           result.document.verificationHash,
 
         verificationUrl,
-
-        pdfUrl:
-          result.document.pdfUrl,
 
         createdAt:
           result.document.createdAt

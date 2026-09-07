@@ -100,3 +100,12 @@ export const downloadDocument = async (
 
   return response.data;
 };
+
+export const viewDocument = async (documentId: string) => {
+  const response = await api.get(
+    `/documents/${documentId}/view`,
+    { responseType: "blob" }
+  );
+
+  return response.data as Blob;
+};

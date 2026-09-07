@@ -111,10 +111,10 @@ model Employee {
   resignationDate DateTime?
   lastWorkingDay  DateTime?
   status          EmployeeStatus        @default(INVITED)
-  basicSalary     Float                 @default(0)
-  hra             Float                 @default(0)
-  allowances      Float                 @default(0)
-  deductions      Float                 @default(0)
+  basicSalary     Decimal               @default(0) @db.Decimal(12, 2)
+  hra             Decimal               @default(0) @db.Decimal(12, 2)
+  allowances      Decimal               @default(0) @db.Decimal(12, 2)
+  deductions      Decimal               @default(0) @db.Decimal(12, 2)
   bankAccountNo   String?
   bankIfsc        String?
   panCard         String?

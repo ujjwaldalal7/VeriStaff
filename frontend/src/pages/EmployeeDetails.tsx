@@ -10,8 +10,9 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { getEmployee } from "../services/employeeApi";
+import { getEmployee, updateEmployee } from "../services/employeeApi";
 import { createOnboardingInvite } from "../services/onboardingApi";
+import { resignEmployeeWithClearances } from "../services/clearanceApi";
 
 import type {
   Employee
@@ -90,6 +91,15 @@ export default function EmployeeDetails() {
     useState<string | null>(null);
   const [inviteError, setInviteError] =
     useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [offboardingOpen, setOffboardingOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [offboardingForm, setOffboardingForm] = useState({
+    resignationDate: "",
+    lastWorkingDay: ""
+  });
 
   useEffect(() => {
     if (!id) {
@@ -155,6 +165,59 @@ export default function EmployeeDetails() {
       );
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  const openEdit = () => {
+    setEditForm({
+      employeeCode: employee.employeeCode,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      department: employee.department,
+      designation: employee.designation,
+      joiningDate: employee.joiningDate.slice(0, 10),
+      basicSalary: String(employee.basicSalary),
+      hra: String(employee.hra),
+      allowances: String(employee.allowances),
+      deductions: String(employee.deductions)
+    });
+    setActionError(null);
+    setEditOpen(true);
+  };
+
+  const handleEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      const response = await updateEmployee(employee.id, {
+        ...editForm,
+        basicSalary: Number(editForm.basicSalary),
+        hra: Number(editForm.hra),
+        allowances: Number(editForm.allowances),
+        deductions: Number(editForm.deductions)
+      });
+      setEmployee(response.data);
+      setEditOpen(false);
+    } catch (err: unknown) {
+      setActionError(getApiErrorMessage(err, "Unable to update employee."));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleOffboarding = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      const response = await resignEmployeeWithClearances(employee.id, offboardingForm);
+      setEmployee(response.data.employee);
+      setOffboardingOpen(false);
+    } catch (err: unknown) {
+      setActionError(getApiErrorMessage(err, "Unable to start offboarding."));
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -236,6 +299,19 @@ export default function EmployeeDetails() {
               {employee.status}
             </Badge>
 
+            <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={openEdit}>
+              Edit Employee
+            </Button>
+            {employee.status === "ACTIVE" && (
+              <Button type="button" variant="danger" onClick={() => {
+                setActionError(null);
+                setOffboardingForm({ resignationDate: "", lastWorkingDay: "" });
+                setOffboardingOpen(true);
+              }}>
+                Start Offboarding
+              </Button>
+            )}
             {!employee.userId && (
               <Button
                 type="button"
@@ -250,6 +326,7 @@ export default function EmployeeDetails() {
                 Issue Invite
               </Button>
             )}
+            </div>
           </div>
         </Card>
 
@@ -576,6 +653,23 @@ export default function EmployeeDetails() {
                 : "Create Invite"}
             </Button>
           </div>
+        </form>
+      </Modal>
+
+      <Modal open={editOpen} onClose={() => !actionLoading && setEditOpen(false)} title="Edit Employee">
+        <form onSubmit={handleEdit} className="grid gap-4 sm:grid-cols-2">
+          {actionError && <p className="sm:col-span-2 text-sm text-red-600">{actionError}</p>}
+          {[["employeeCode", "Employee Code"], ["firstName", "First Name"], ["lastName", "Last Name"], ["department", "Department"], ["designation", "Designation"], ["joiningDate", "Joining Date"], ["basicSalary", "Basic Salary"], ["hra", "HRA"], ["allowances", "Allowances"], ["deductions", "Deductions"]].map(([key, label]) => <Input key={key} label={label} type={key === "joiningDate" ? "date" : ["basicSalary", "hra", "allowances", "deductions"].includes(key) ? "number" : "text"} min={["basicSalary", "hra", "allowances", "deductions"].includes(key) ? 0 : undefined} step={["basicSalary", "hra", "allowances", "deductions"].includes(key) ? "0.01" : undefined} value={editForm[key] ?? ""} onChange={(event) => setEditForm((current) => ({ ...current, [key]: event.target.value }))} required />)}
+          <div className="sm:col-span-2 flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditOpen(false)} disabled={actionLoading}>Cancel</Button><Button type="submit" disabled={actionLoading}>{actionLoading ? "Saving..." : "Save Changes"}</Button></div>
+        </form>
+      </Modal>
+
+      <Modal open={offboardingOpen} onClose={() => !actionLoading && setOffboardingOpen(false)} title="Start Offboarding" description="This will mark the employee as RESIGNED and start the IT, Finance and HR clearance process.">
+        <form onSubmit={handleOffboarding} className="space-y-4">
+          {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+          <Input label="Resignation Date" type="date" min={employee.joiningDate.slice(0, 10)} value={offboardingForm.resignationDate} onChange={(event) => setOffboardingForm((current) => ({ ...current, resignationDate: event.target.value }))} required />
+          <Input label="Last Working Day" type="date" min={offboardingForm.resignationDate || employee.joiningDate.slice(0, 10)} value={offboardingForm.lastWorkingDay} onChange={(event) => setOffboardingForm((current) => ({ ...current, lastWorkingDay: event.target.value }))} required />
+          <div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setOffboardingOpen(false)} disabled={actionLoading}>Cancel</Button><Button type="submit" variant="danger" disabled={actionLoading}>{actionLoading ? "Starting..." : "Confirm Offboarding"}</Button></div>
         </form>
       </Modal>
     </div>

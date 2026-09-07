@@ -1,5 +1,6 @@
 import {
   Download,
+  Eye,
   FilePlus2,
   RefreshCw,
   ShieldX
@@ -16,7 +17,8 @@ import {
   downloadDocument,
   getDocuments,
   getMyDocuments,
-  revokeDocument
+  revokeDocument,
+  viewDocument
 } from "../services/documentApi";
 import { getEmployees } from "../services/employeeApi";
 import type {
@@ -199,6 +201,20 @@ export default function Documents() {
     }
   };
 
+  const handleView = async (document: GeneratedDocument) => {
+    try {
+      setWorking(document.id);
+      const blob = await viewDocument(document.id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Unable to open document."));
+    } finally {
+      setWorking(null);
+    }
+  };
+
   return (
     <div className="min-h-full bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
       <div className="mx-auto max-w-7xl">
@@ -367,6 +383,16 @@ export default function Documents() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
+                          {document.status === "VALID" && (
+                            <Button size="sm" variant="secondary" onClick={() => void handleView(document)} disabled={working === document.id}>
+                              <Eye size={15} />
+                              View
+                            </Button>
+                          )}
+                          <a href={`/verify-doc/${document.verificationHash}`} target="_blank" rel="noreferrer">
+                            <Button size="sm" variant="secondary">Verify</Button>
+                          </a>
+                          {document.status === "VALID" && (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -378,6 +404,7 @@ export default function Documents() {
                             <Download size={15} />
                             Download
                           </Button>
+                          )}
 
                           {isAdmin &&
                             document.status === "VALID" && (

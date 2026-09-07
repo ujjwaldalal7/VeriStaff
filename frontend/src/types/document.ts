@@ -15,7 +15,6 @@ export interface GeneratedDocument {
   docNumber: string;
   docType: DocumentType;
   verificationHash: string;
-  pdfUrl?: string | null;
   status: DocumentStatus;
   revokedAt?: string | null;
   createdAt: string;
