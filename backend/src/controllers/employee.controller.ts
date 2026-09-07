@@ -292,6 +292,16 @@ export const getEmployee = asyncHandler(async (req: Request, res: Response) => {
       },
       clearances: true,
       documents: {
+        select: {
+          id: true,
+          employeeId: true,
+          docNumber: true,
+          docType: true,
+          verificationHash: true,
+          status: true,
+          revokedAt: true,
+          createdAt: true
+        },
         orderBy: { createdAt: "desc" }
       }
     }

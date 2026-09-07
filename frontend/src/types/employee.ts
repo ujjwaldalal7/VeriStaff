@@ -23,10 +23,10 @@ export interface Employee {
 
   status: EmployeeStatus;
 
-  basicSalary: number;
-  hra: number;
-  allowances: number;
-  deductions: number;
+  basicSalary: string | number;
+  hra: string | number;
+  allowances: string | number;
+  deductions: string | number;
 
   bankAccountNo: string | null;
   bankIfsc: string | null;

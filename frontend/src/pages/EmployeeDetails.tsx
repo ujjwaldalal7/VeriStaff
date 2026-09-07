@@ -24,6 +24,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Modal from "../components/ui/Modal";
 import { getApiErrorMessage } from "../utils/apiError";
+import { useAppSelector } from "../hooks/redux";
 
 const statusVariant = (
   status: Employee["status"]
@@ -64,17 +65,19 @@ const formatDate = (date: string | null) => {
   );
 };
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value: string | number) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2
-  }).format(value);
+  }).format(Number(value));
 };
 
 export default function EmployeeDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const user = useAppSelector((state) => state.auth.user);
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "HR_ADMIN";
 
   const [employee, setEmployee] =
     useState<Employee | null>(null);
@@ -169,6 +172,10 @@ export default function EmployeeDetails() {
   };
 
   const openEdit = () => {
+    if (!employee) {
+      return;
+    }
+
     setEditForm({
       employeeCode: employee.employeeCode,
       firstName: employee.firstName,
@@ -187,6 +194,11 @@ export default function EmployeeDetails() {
 
   const handleEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!employee) {
+      return;
+    }
+
     try {
       setActionLoading(true);
       setActionError(null);
@@ -208,6 +220,11 @@ export default function EmployeeDetails() {
 
   const handleOffboarding = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!employee) {
+      return;
+    }
+
     try {
       setActionLoading(true);
       setActionError(null);
@@ -300,10 +317,10 @@ export default function EmployeeDetails() {
             </Badge>
 
             <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={openEdit}>
+            {isAdmin && <Button type="button" variant="secondary" onClick={openEdit}>
               Edit Employee
-            </Button>
-            {employee.status === "ACTIVE" && (
+            </Button>}
+            {isAdmin && employee.status === "ACTIVE" && (
               <Button type="button" variant="danger" onClick={() => {
                 setActionError(null);
                 setOffboardingForm({ resignationDate: "", lastWorkingDay: "" });
@@ -312,7 +329,7 @@ export default function EmployeeDetails() {
                 Start Offboarding
               </Button>
             )}
-            {!employee.userId && (
+            {isAdmin && !employee.userId && (
               <Button
                 type="button"
                 onClick={() => {

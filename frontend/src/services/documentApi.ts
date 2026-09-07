@@ -98,6 +98,7 @@ export const downloadDocument = async (
     }
   );
 
+  assertPdfResponse(response.headers["content-type"]?.toString());
   return response.data;
 };
 
@@ -107,5 +108,12 @@ export const viewDocument = async (documentId: string) => {
     { responseType: "blob" }
   );
 
+  assertPdfResponse(response.headers["content-type"]?.toString());
   return response.data as Blob;
+};
+
+const assertPdfResponse = (contentType?: string) => {
+  if (!contentType?.toLowerCase().includes("application/pdf")) {
+    throw new Error("The document file could not be retrieved.");
+  }
 };

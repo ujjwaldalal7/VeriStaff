@@ -9,6 +9,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { createSha256 } from "../utils/tokens.js";
 import { env } from "../config/env.js";
 import type { AuthRequest } from "../types/auth.js";
+import { Prisma } from "../generated/prisma/client.js";
 import { getRequiredParam } from "../utils/requestParams.js";
 import {ensureEmployeeAccess} from "../utils/employeeAccess.js";
 import { generatePdfFromHtml } from "../services/pdf.service.js";
@@ -268,11 +269,10 @@ export const createDocumentRecord = asyncHandler(
     const employeeName =
       `${employee.firstName} ${employee.lastName}`;
 
-    const totalSalary =
-      Number(employee.basicSalary) +
-      Number(employee.hra) +
-      Number(employee.allowances) -
-      Number(employee.deductions);
+    const totalSalary = new Prisma.Decimal(employee.basicSalary)
+      .add(employee.hra)
+      .add(employee.allowances)
+      .sub(employee.deductions);
 
     const commonTemplateData = {
       companyName:
@@ -380,9 +380,7 @@ export const createDocumentRecord = asyncHandler(
           ),
 
         totalSalary:
-          totalSalary.toLocaleString(
-            "en-IN"
-          )
+          totalSalary.toFixed(2)
       });
     }
 

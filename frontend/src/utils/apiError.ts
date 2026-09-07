@@ -12,5 +12,9 @@ export const getApiErrorMessage = (
     return error.response?.data?.message || fallback;
   }
 
+  if (error instanceof Error) {
+    return error.message;
+  }
+
   return fallback;
 };

@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
+import { Prisma } from "../generated/prisma/client.js";
 
 import crypto from "node:crypto";
 import QRCode from "qrcode";
@@ -73,6 +74,11 @@ const formatDate = (date: Date): string => {
 
 
 
+const moneySchema = z.union([
+  z.number().finite().nonnegative(),
+  z.string().trim().regex(/^\d+(\.\d{1,2})?$/)
+]).transform((value) => new Prisma.Decimal(value));
+
 const createPayslipSchema = z.object({
   employeeId: z.string().uuid(),
 
@@ -87,10 +93,10 @@ const createPayslipSchema = z.object({
     .int()
     .min(2000)
     .max(2100),
-  basicSalary: z.number().nonnegative(),
-  hra: z.number().nonnegative(),
-  allowances: z.number().nonnegative(),
-  deductions: z.number().nonnegative()
+  basicSalary: moneySchema,
+  hra: moneySchema,
+  allowances: moneySchema,
+  deductions: moneySchema
 });
 
 export const listPayslips = asyncHandler(
@@ -288,16 +294,13 @@ export const createPayslip = asyncHandler(
 
     const { basicSalary, hra, allowances, deductions } = data;
 
-    const grossSalary =
-      basicSalary +
-      hra +
-      allowances;
+    const grossSalary = basicSalary
+      .add(hra)
+      .add(allowances);
 
-    const netSalary =
-      grossSalary -
-      deductions;
+    const netSalary = grossSalary.sub(deductions);
 
-    if (netSalary < 0) {
+    if (netSalary.isNegative()) {
       throw new ApiError(
         400,
         "Net salary cannot be negative"
