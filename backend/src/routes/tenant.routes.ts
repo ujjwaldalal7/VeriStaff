@@ -15,7 +15,7 @@ const router = Router();
 router.get(
   "/me",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"),
   getTenant
 );
 

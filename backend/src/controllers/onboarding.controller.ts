@@ -7,6 +7,7 @@ import { createSecureToken } from "../utils/tokens.js";
 import { hashPassword } from "../utils/password.js";
 import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 const inviteSchema = z.object({
   employeeId: z.string().uuid(),
@@ -78,6 +79,16 @@ export const createInvite = asyncHandler(
       );
     }
 
+    if (
+      employee.status !== "INVITED" &&
+      employee.status !== "ONBOARDING"
+    ) {
+      throw new ApiError(
+        400,
+        "Onboarding invitation can only be created for an invited or onboarding employee"
+      );
+    }
+
     const existingInvite = await prisma.onboardingInvite.findFirst({
       where: {
         employeeId: employee.id,
@@ -122,6 +133,21 @@ export const createInvite = asyncHandler(
       });
 
       return createdInvite;
+    });
+
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "EMPLOYEE_UPDATE",
+      entityType: "Employee",
+      entityId: employee.id,
+      metadata: {
+        employeeCode: employee.employeeCode,
+        status: "ONBOARDING",
+        source: "ONBOARDING_INVITE"
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
     });
 
     res.status(201).json({
@@ -231,6 +257,16 @@ export const completeOnboarding = asyncHandler(
         );
       }
 
+      if (
+        employee.status !== "INVITED" &&
+        employee.status !== "ONBOARDING"
+      ) {
+        throw new ApiError(
+          400,
+          "Onboarding is no longer available for this employee"
+        );
+      }
+
       const existingUser = await tx.user.findUnique({
         where: {
           email: invite.email
@@ -284,6 +320,20 @@ export const completeOnboarding = asyncHandler(
       return {
         employee: updatedEmployee
       };
+    });
+
+    await createAuditLog({
+      tenantId: result.employee.tenantId,
+      action: "EMPLOYEE_UPDATE",
+      entityType: "Employee",
+      entityId: result.employee.id,
+      metadata: {
+        employeeCode: result.employee.employeeCode,
+        status: result.employee.status,
+        source: "ONBOARDING_COMPLETE"
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
     });
 
     res.status(201).json({

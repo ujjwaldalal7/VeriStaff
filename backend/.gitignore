@@ -7,3 +7,4 @@ src/generated/
 coverage/
 *.log
 .DS_Store
+*.zip

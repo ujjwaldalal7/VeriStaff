@@ -8,6 +8,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { hashPassword } from "../utils/password.js";
 import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 const changePasswordSchema = z
   .object({
@@ -104,6 +105,16 @@ export const changePassword = asyncHandler(
       }
     });
 
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "PASSWORD_CHANGE",
+      entityType: "User",
+      entityId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
+
     res.json({
       success: true,
       message: "Password changed successfully"
@@ -171,6 +182,20 @@ export const resetEmployeePassword = asyncHandler(
       data: {
         passwordHash
       }
+    });
+
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "PASSWORD_RESET",
+      entityType: "User",
+      entityId: employee.user.id,
+      metadata: {
+        employeeId: employee.id,
+        employeeCode: employee.employeeCode
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
     });
 
     res.json({

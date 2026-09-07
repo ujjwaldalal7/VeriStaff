@@ -3,9 +3,22 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
+import type { AuditAction } from "../generated/prisma/client.js";
 
 const auditQuerySchema = z.object({
-  action: z.string().optional(),
+  action: z.enum([
+    "LOGIN",
+    "PASSWORD_CHANGE",
+    "PASSWORD_RESET",
+    "EMPLOYEE_CREATE",
+    "EMPLOYEE_UPDATE",
+    "EMPLOYEE_RESIGN",
+    "CLEARANCE_UPDATE",
+    "DOCUMENT_CREATE",
+    "DOCUMENT_DOWNLOAD",
+    "DOCUMENT_REVOKE",
+    "DOCUMENT_DELETE"
+  ]).optional(),
   entityType: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20)
@@ -23,7 +36,7 @@ export const getAuditLogs = asyncHandler(
       tenantId: auth.tenantId,
       ...(query.action
         ? {
-            action: query.action as any
+            action: query.action as AuditAction
           }
         : {}),
       ...(query.entityType

@@ -5,6 +5,8 @@ import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
+import { ensureEmployeeAccess } from "../utils/employeeAccess.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 const resignationSchema = z.object({
   resignationDate: z.coerce.date(),
@@ -110,6 +112,21 @@ export const submitResignation = asyncHandler(
       };
     });
 
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "EMPLOYEE_RESIGN",
+      entityType: "Employee",
+      entityId: result.employee.id,
+      metadata: {
+        employeeCode: result.employee.employeeCode,
+        resignationDate: result.employee.resignationDate?.toISOString(),
+        lastWorkingDay: result.employee.lastWorkingDay?.toISOString()
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
+
     res.status(201).json({
       success: true,
       message: "Resignation submitted and clearance process started",
@@ -137,6 +154,8 @@ export const getEmployeeClearances = asyncHandler(
         employeeCode: true,
         firstName: true,
         lastName: true,
+        tenantId: true,
+        userId: true,
         status: true,
         resignationDate: true,
         lastWorkingDay: true
@@ -146,6 +165,8 @@ export const getEmployeeClearances = asyncHandler(
     if (!employee) {
       throw new ApiError(404, "Employee not found");
     }
+
+    ensureEmployeeAccess(employee, auth);
 
     const clearances = await prisma.departmentClearance.findMany({
       where: {
@@ -328,6 +349,23 @@ export const updateClearance = asyncHandler(
       }
     );
 
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "CLEARANCE_UPDATE",
+      entityType: "DepartmentClearance",
+      entityId: result.updatedClearance.id,
+      metadata: {
+        employeeId: result.updatedEmployee.id,
+        employeeCode: result.updatedEmployee.employeeCode,
+        department,
+        status: result.updatedClearance.status,
+        allApproved: result.allApproved
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
+
     res.json({
       success: true,
       message: result.allApproved
@@ -363,6 +401,8 @@ export const getClearanceStatus = asyncHandler(
         employeeCode: true,
         firstName: true,
         lastName: true,
+        tenantId: true,
+        userId: true,
         status: true
       }
     });
@@ -370,6 +410,8 @@ export const getClearanceStatus = asyncHandler(
     if (!employee) {
       throw new ApiError(404, "Employee not found");
     }
+
+    ensureEmployeeAccess(employee, auth);
 
     const clearances =
       await prisma.departmentClearance.findMany({

@@ -23,7 +23,6 @@ router.get(
   authorize(
     "SUPER_ADMIN",
     "HR_ADMIN",
-    "MANAGER",
     "EMPLOYEE"
   ),
   getEmployeeClearances
@@ -42,7 +41,6 @@ router.get(
   authorize(
     "SUPER_ADMIN",
     "HR_ADMIN",
-    "MANAGER",
     "EMPLOYEE"
   ),
   getClearanceStatus

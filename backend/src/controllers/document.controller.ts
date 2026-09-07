@@ -449,6 +449,22 @@ export const createDocumentRecord = asyncHandler(
         }
       });
 
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "DOCUMENT_CREATE",
+      entityType: "GeneratedDocument",
+      entityId: document.id,
+      metadata: {
+        docNumber: document.docNumber,
+        docType: document.docType,
+        employeeId: employee.id,
+        employeeCode: employee.employeeCode
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
+
     /*
      * ---------------------------------------------------------
      * 15. Response
@@ -677,6 +693,20 @@ export const deleteDocument = asyncHandler(
       }
     });
 
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "DOCUMENT_DELETE",
+      entityType: "GeneratedDocument",
+      entityId: document.id,
+      metadata: {
+        docNumber: document.docNumber,
+        docType: document.docType
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
+
     res.json({
       success: true,
       message:
@@ -728,6 +758,8 @@ export const getMyDocuments = asyncHandler(
           docType: true,
           verificationHash: true,
           pdfUrl: true,
+          status: true,
+          revokedAt: true,
           createdAt: true
         },
         orderBy: {
@@ -863,6 +895,15 @@ export const getDocumentDownload = asyncHandler(
     }
 
     ensureEmployeeAccess(document.employee, auth);
+
+    
+    
+    if (document.status === "REVOKED") {
+      throw new ApiError(
+        403,
+        "This document has been revoked and is no longer available for download"
+      );
+    }
 
     if (!document.pdfUrl) {
       throw new ApiError(

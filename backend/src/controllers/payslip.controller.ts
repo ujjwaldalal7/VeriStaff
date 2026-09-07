@@ -18,6 +18,7 @@ import { uploadPdfToCloudinary } from "../services/cloudinary.service.js";
 import { payslipTemplate } from "../templates/payslip.template.js";
 
 import { getRequiredParam } from "../utils/requestParams.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 
 const monthNames = [
@@ -84,6 +85,119 @@ const createPayslipSchema = z.object({
     .min(2000)
     .max(2100)
 });
+
+export const listPayslips = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const payslips = await prisma.payslip.findMany({
+      where: {
+        employee: {
+          tenantId: auth.tenantId
+        }
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            department: true,
+            designation: true,
+            status: true
+          }
+        },
+        generatedDocument: {
+          select: {
+            id: true,
+            docNumber: true,
+            status: true,
+            pdfUrl: true,
+            verificationHash: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: [
+        {
+          year: "desc"
+        },
+        {
+          month: "desc"
+        }
+      ]
+    });
+
+    res.json({
+      success: true,
+      count: payslips.length,
+      data: payslips
+    });
+  }
+);
+
+export const getMyPayslips = asyncHandler(
+  async (req: Request, res: Response) => {
+    const auth = (req as AuthRequest).user!;
+
+    const employee = await prisma.employee.findFirst({
+      where: {
+        userId: auth.userId,
+        tenantId: auth.tenantId
+      },
+      select: {
+        id: true,
+        employeeCode: true,
+        firstName: true,
+        lastName: true,
+        department: true,
+        designation: true
+      }
+    });
+
+    if (!employee) {
+      throw new ApiError(
+        404,
+        "Employee profile not found"
+      );
+    }
+
+    const payslips = await prisma.payslip.findMany({
+      where: {
+        employeeId: employee.id
+      },
+      include: {
+        generatedDocument: {
+          select: {
+            id: true,
+            docNumber: true,
+            status: true,
+            pdfUrl: true,
+            verificationHash: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: [
+        {
+          year: "desc"
+        },
+        {
+          month: "desc"
+        }
+      ]
+    });
+
+    res.json({
+      success: true,
+      data: {
+        employee,
+        payslips
+      }
+    });
+  }
+);
 
 export const createPayslip = asyncHandler(
   async (req: Request, res: Response) => {
@@ -539,6 +653,25 @@ export const generatePayslipDocument = asyncHandler(
           };
         }
       );
+
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "DOCUMENT_CREATE",
+      entityType: "GeneratedDocument",
+      entityId: result.document.id,
+      metadata: {
+        docNumber: result.document.docNumber,
+        docType: result.document.docType,
+        payslipId: result.payslip.id,
+        employeeId: employee.id,
+        employeeCode: employee.employeeCode,
+        month: payslip.month,
+        year: payslip.year
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
+    });
 
     res.status(201).json({
       success: true,

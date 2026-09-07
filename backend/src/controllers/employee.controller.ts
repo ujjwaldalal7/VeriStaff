@@ -7,12 +7,12 @@ import type { AuthRequest } from "../types/auth.js";
 import { getRequiredParam } from "../utils/requestParams.js";
 import { ensureEmployeeAccess } from "../utils/employeeAccess.js";
 import type { EmployeeStatus } from "../generated/prisma/client.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 const createEmployeeSchema = z.object({
   employeeCode: z.string().min(1).max(30),
   firstName: z.string().min(1).max(50),
   lastName: z.string().min(1).max(50),
-  email: z.string().email().optional(),
   department: z.string().min(1).max(100),
   designation: z.string().min(1).max(100),
   joiningDate: z.coerce.date(),
@@ -22,7 +22,18 @@ const createEmployeeSchema = z.object({
   deductions: z.number().nonnegative().default(0)
 });
 
-const updateEmployeeSchema = createEmployeeSchema.partial();
+const updateEmployeeSchema = z.object({
+  employeeCode: z.string().min(1).max(30).optional(),
+  firstName: z.string().trim().min(1).max(50).optional(),
+  lastName: z.string().trim().min(1).max(50).optional(),
+  department: z.string().trim().min(1).max(100).optional(),
+  designation: z.string().trim().min(1).max(100).optional(),
+  joiningDate: z.coerce.date().optional(),
+  basicSalary: z.number().nonnegative().optional(),
+  hra: z.number().nonnegative().optional(),
+  allowances: z.number().nonnegative().optional(),
+  deductions: z.number().nonnegative().optional()
+});
 
 const updateMyProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(50).optional(),
@@ -107,17 +118,6 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
     throw new ApiError(409, "Employee code already exists in this organization");
   }
 
-
-  if (data.email) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email.toLowerCase() }
-    });
-
-    if (existingUser) {
-      throw new ApiError(409, "Email is already registered");
-    }
-  }
-
   const employee = await prisma.employee.create({
     data: {
       tenantId: auth.tenantId,
@@ -132,6 +132,21 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
       allowances: data.allowances,
       deductions: data.deductions
     }
+  });
+
+  await createAuditLog({
+    tenantId: auth.tenantId,
+    actorId: auth.userId,
+    action: "EMPLOYEE_CREATE",
+    entityType: "Employee",
+    entityId: employee.id,
+    metadata: {
+      employeeCode: employee.employeeCode,
+      department: employee.department,
+      designation: employee.designation
+    },
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent") ?? undefined
   });
 
   res.status(201).json({
@@ -312,60 +327,22 @@ export const updateEmployee = asyncHandler(async (req: Request, res: Response) =
     data
   });
 
+  await createAuditLog({
+    tenantId: auth.tenantId,
+    actorId: auth.userId,
+    action: "EMPLOYEE_UPDATE",
+    entityType: "Employee",
+    entityId: updated.id,
+    metadata: {
+      employeeCode: updated.employeeCode
+    },
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent") ?? undefined
+  });
+
   res.json({
     success: true,
     message: "Employee updated",
-    data: updated
-  });
-});
-
-export const resignEmployee = asyncHandler(async (req: Request, res: Response) => {
-  const auth = (req as AuthRequest).user!;
-
-  const schema = z.object({
-    resignationDate: z.coerce.date(),
-    lastWorkingDay: z.coerce.date()
-  });
-
-  const data = schema.parse(req.body);
-
-  const employee = await prisma.employee.findFirst({
-    where: {
-      id: getRequiredParam(req, "id"),
-      tenantId: auth.tenantId
-    }
-  });
-
-  if (!employee) throw new ApiError(404, "Employee not found");
-
-  const updated = await prisma.$transaction(async (tx) => {
-    const updatedEmployee = await tx.employee.update({
-      where: { id: employee.id },
-      data: {
-        resignationDate: data.resignationDate,
-        lastWorkingDay: data.lastWorkingDay,
-        status: "RESIGNED"
-      }
-    });
-
-    await tx.departmentClearance.deleteMany({
-      where: { employeeId: employee.id }
-    });
-
-    await tx.departmentClearance.createMany({
-      data: [
-        { employeeId: employee.id, department: "IT" },
-        { employeeId: employee.id, department: "FINANCE" },
-        { employeeId: employee.id, department: "HR" }
-      ]
-    });
-
-    return updatedEmployee;
-  });
-
-  res.json({
-    success: true,
-    message: "Employee resigned and clearance workflow started",
     data: updated
   });
 });
@@ -447,6 +424,20 @@ export const updateMyProfile = asyncHandler(
         id: employee.id
       },
       data
+    });
+
+    await createAuditLog({
+      tenantId: auth.tenantId,
+      actorId: auth.userId,
+      action: "EMPLOYEE_UPDATE",
+      entityType: "Employee",
+      entityId: updated.id,
+      metadata: {
+        employeeCode: updated.employeeCode,
+        source: "EMPLOYEE_SELF_SERVICE"
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined
     });
 
     res.json({

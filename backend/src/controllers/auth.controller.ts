@@ -6,6 +6,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { comparePassword, hashPassword } from "../utils/password.js";
 import { signAccessToken } from "../utils/jwt.js";
 import type { AuthRequest } from "../types/auth.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 const registerSchema = z.object({
   organizationName: z.string().min(2).max(100),
@@ -23,9 +24,11 @@ const loginSchema = z.object({
 
 export const registerTenant = asyncHandler(async (req: Request, res: Response) => {
   const data = registerSchema.parse(req.body);
+  const normalizedEmail = data.email.toLowerCase();
+  const normalizedDomain = data.domain.toLowerCase();
 
   const existingDomain = await prisma.tenant.findUnique({
-    where: { domain: data.domain }
+    where: { domain: normalizedDomain }
   });
 
   if (existingDomain) {
@@ -33,7 +36,7 @@ export const registerTenant = asyncHandler(async (req: Request, res: Response) =
   }
 
   const existingUser = await prisma.user.findUnique({
-    where: { email: data.email }
+    where: { email: normalizedEmail }
   });
 
   if (existingUser) {
@@ -46,7 +49,7 @@ export const registerTenant = asyncHandler(async (req: Request, res: Response) =
     const tenant = await tx.tenant.create({
       data: {
         name: data.organizationName,
-        domain: data.domain,
+        domain: normalizedDomain,
         footerAddress: ""
       }
     });
@@ -54,7 +57,7 @@ export const registerTenant = asyncHandler(async (req: Request, res: Response) =
     const user = await tx.user.create({
       data: {
         tenantId: tenant.id,
-        email: data.email.toLowerCase(),
+        email: normalizedEmail,
         passwordHash,
         role: "SUPER_ADMIN"
       }
@@ -106,6 +109,20 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     tenantId: user.tenantId,
     role: user.role,
     email: user.email
+  });
+
+  await createAuditLog({
+    tenantId: user.tenantId,
+    actorId: user.id,
+    action: "LOGIN",
+    entityType: "User",
+    entityId: user.id,
+    metadata: {
+      email: user.email,
+      role: user.role
+    },
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent") ?? undefined
   });
 
   res.json({
