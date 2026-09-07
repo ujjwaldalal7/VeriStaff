@@ -9,6 +9,7 @@ import type {
 
 export interface CreateEmployeeRequest {
   employeeCode: string;
+  email?: string;
   firstName: string;
   lastName: string;
   department: string;

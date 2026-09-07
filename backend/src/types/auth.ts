@@ -5,6 +5,7 @@ export interface AuthPayload {
   tenantId: string;
   role: Role;
   email: string;
+  tokenVersion: number;
 }
 
 export interface AuthRequest extends Express.Request {

@@ -10,6 +10,7 @@ import payslipRoutes from "./payslip.routes.js";
 import passwordRoutes from "./password.routes.js";
 import auditRoutes from "./audit.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
+import userRoutes from "./user.routes.js";
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use("/payslips", payslipRoutes);
 router.use("/password",passwordRoutes);
 router.use("/audit-logs", auditRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/users", userRoutes);
 
 export default router;

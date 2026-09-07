@@ -10,8 +10,8 @@ export interface CreatePayslipRequest {
   deductions: number;
 }
 
-export const getPayslips = async () => {
-  const response = await api.get("/payslips");
+export const getPayslips = async (params?: { page?: number; limit?: number; employeeId?: string; month?: number; year?: number; status?: "VALID" | "REVOKED" }) => {
+  const response = await api.get("/payslips", { params });
 
   return response.data;
 };

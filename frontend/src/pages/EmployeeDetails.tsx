@@ -334,7 +334,7 @@ export default function EmployeeDetails() {
                 type="button"
                 onClick={() => {
                   setInviteOpen(true);
-                  setInviteEmail("");
+                  setInviteEmail(employee.email || "");
                   setInviteError(null);
                   setInviteMessage(null);
                 }}

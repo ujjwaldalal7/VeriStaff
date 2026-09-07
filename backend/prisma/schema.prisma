@@ -58,6 +58,15 @@ enum AuditAction {
   DOCUMENT_DOWNLOAD
   DOCUMENT_REVOKE
   DOCUMENT_DELETE
+  DOCUMENT_VIEW
+  USER_CREATE
+  USER_ROLE_CHANGE
+  USER_DISABLE
+  USER_ENABLE
+  ONBOARDING_INVITE
+  ONBOARDING_COMPLETE
+  BRANDING_UPDATE
+  MANAGER_ASSIGNMENT
 }
 
 model Tenant {
@@ -86,7 +95,12 @@ model User {
   email          String                @unique
   passwordHash   String
   role           Role                  @default(EMPLOYEE)
+  isActive       Boolean               @default(true)
+  tokenVersion   Int                   @default(0)
+  firstName      String?
+  lastName       String?
   employee       Employee?
+  managedEmployees ManagerAssignment[] @relation("ManagerAssignments")
   clearancesDone DepartmentClearance[] @relation("ClearedBy")
   auditLogs AuditLog[]
   revokedDocuments GeneratedDocument[] @relation("RevokedBy")
@@ -103,6 +117,7 @@ model Employee {
   userId          String?               @unique
   user            User?                 @relation(fields: [userId], references: [id])
   employeeCode    String
+  email           String?
   firstName       String
   lastName        String
   department      String
@@ -122,12 +137,26 @@ model Employee {
   documents       GeneratedDocument[]
   clearances      DepartmentClearance[]
   payslips        Payslip[]
+  managerAssignments ManagerAssignment[]
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId])
   @@index([tenantId, status])
+}
+
+model ManagerAssignment {
+  id         String   @id @default(uuid())
+  managerId  String
+  employeeId String
+  manager    User     @relation("ManagerAssignments", fields: [managerId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([managerId, employeeId])
+  @@index([managerId])
+  @@index([employeeId])
 }
 
 model Payslip {

@@ -8,6 +8,9 @@ export const getDashboardStats = asyncHandler(
     const auth = (req as AuthRequest).user!;
 
     const tenantId = auth.tenantId;
+    const employeeScope = auth.role === "MANAGER"
+      ? { managerAssignments: { some: { managerId: auth.userId } } }
+      : {};
 
     const [
       totalEmployees,
@@ -24,12 +27,13 @@ export const getDashboardStats = asyncHandler(
       rejectedClearances
     ] = await prisma.$transaction([
       prisma.employee.count({
-        where: { tenantId }
+        where: { tenantId, ...employeeScope }
       }),
 
       prisma.employee.count({
         where: {
           tenantId,
+          ...employeeScope,
           status: "INVITED"
         }
       }),
@@ -37,6 +41,7 @@ export const getDashboardStats = asyncHandler(
       prisma.employee.count({
         where: {
           tenantId,
+          ...employeeScope,
           status: "ONBOARDING"
         }
       }),
@@ -44,6 +49,7 @@ export const getDashboardStats = asyncHandler(
       prisma.employee.count({
         where: {
           tenantId,
+          ...employeeScope,
           status: "ACTIVE"
         }
       }),
@@ -51,6 +57,7 @@ export const getDashboardStats = asyncHandler(
       prisma.employee.count({
         where: {
           tenantId,
+          ...employeeScope,
           status: "RESIGNED"
         }
       }),
@@ -58,17 +65,26 @@ export const getDashboardStats = asyncHandler(
       prisma.employee.count({
         where: {
           tenantId,
+          ...employeeScope,
           status: "OFFBOARDED"
         }
       }),
 
       prisma.generatedDocument.count({
-        where: { tenantId }
+        where: {
+          tenantId,
+          ...(auth.role === "MANAGER"
+            ? { employee: employeeScope }
+            : {})
+        }
       }),
 
       prisma.generatedDocument.count({
         where: {
           tenantId,
+          ...(auth.role === "MANAGER"
+            ? { employee: employeeScope }
+            : {}),
           status: "VALID"
         }
       }),
@@ -76,6 +92,9 @@ export const getDashboardStats = asyncHandler(
       prisma.generatedDocument.count({
         where: {
           tenantId,
+          ...(auth.role === "MANAGER"
+            ? { employee: employeeScope }
+            : {}),
           status: "REVOKED"
         }
       }),
@@ -83,7 +102,8 @@ export const getDashboardStats = asyncHandler(
       prisma.departmentClearance.count({
         where: {
           employee: {
-            tenantId
+            tenantId,
+            ...employeeScope
           },
           status: "PENDING"
         }
@@ -92,7 +112,8 @@ export const getDashboardStats = asyncHandler(
       prisma.departmentClearance.count({
         where: {
           employee: {
-            tenantId
+            tenantId,
+            ...employeeScope
           },
           status: "APPROVED"
         }
@@ -101,7 +122,8 @@ export const getDashboardStats = asyncHandler(
       prisma.departmentClearance.count({
         where: {
           employee: {
-            tenantId
+            tenantId,
+            ...employeeScope
           },
           status: "REJECTED"
         }

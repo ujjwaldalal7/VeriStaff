@@ -1,5 +1,6 @@
 import { ApiError } from "./apiError.js";
 import type { AuthPayload } from "../types/auth.js";
+import { prisma } from "../lib/prisma.js";
 
 interface EmployeeAccessRecord {
   id: string;
@@ -7,7 +8,7 @@ interface EmployeeAccessRecord {
   userId: string | null;
 }
 
-export const ensureEmployeeAccess = (
+export const ensureEmployeeAccess = async (
   employee: EmployeeAccessRecord,
   auth: AuthPayload
 ) => {
@@ -33,10 +34,16 @@ export const ensureEmployeeAccess = (
   // Manager team access will be implemented when manager/team
   // assignment is introduced.
   if (auth.role === "MANAGER") {
-    throw new ApiError(
-      403,
-      "Manager team access is not configured yet"
-    );
+    const assignment = await prisma.managerAssignment.findFirst({
+      where: {
+        managerId: auth.userId,
+        employeeId: employee.id
+      }
+    });
+
+    if (assignment) return;
+
+    throw new ApiError(403, "You do not have access to this employee");
   }
 
   throw new ApiError(403, "You do not have access to this employee");

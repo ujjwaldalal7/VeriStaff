@@ -6,6 +6,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import type { AuthRequest } from "../types/auth.js";
 import { uploadImageToCloudinary } from "../services/cloudinary.service.js";
 import { getRequiredParam } from "../utils/requestParams.js";
+import { createAuditLog } from "../utils/auditLog.js";
 
 const brandingSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -36,6 +37,15 @@ export const updateBranding = asyncHandler(async (req: Request, res: Response) =
   const tenant = await prisma.tenant.update({
     where: { id: auth.tenantId },
     data
+  });
+
+  await createAuditLog({
+    tenantId: auth.tenantId,
+    actorId: auth.userId,
+    action: "BRANDING_UPDATE",
+    entityType: "Tenant",
+    entityId: tenant.id,
+    metadata: { fields: Object.keys(data) }
   });
 
   res.json({

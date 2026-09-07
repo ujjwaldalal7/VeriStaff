@@ -8,7 +8,7 @@ const router = Router();
 router.get(
   "/stats",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER"),
   getDashboardStats
 );
 

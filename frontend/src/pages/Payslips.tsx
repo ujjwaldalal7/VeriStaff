@@ -2,7 +2,7 @@ import {
   Download,
   Eye,
   FilePlus2,
-  RefreshCw
+  RefreshCw, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
@@ -73,6 +73,7 @@ export default function Payslips() {
   const isAdmin =
     user?.role === "SUPER_ADMIN" ||
     user?.role === "HR_ADMIN";
+  const canBrowseTenantPayslips = isAdmin || user?.role === "MANAGER";
 
   const [payslips, setPayslips] = useState<Payslip[]>(
     []
@@ -98,6 +99,10 @@ export default function Payslips() {
     useState<string | null>(null);
   const [message, setMessage] =
     useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
 
   const employeeOptions = useMemo(
     () =>
@@ -113,13 +118,14 @@ export default function Payslips() {
       setLoading(true);
       setError(null);
 
-      if (isAdmin) {
+      if (canBrowseTenantPayslips) {
         const [payslipResponse, employeeResponse] =
           await Promise.all([
-            getPayslips(),
+            getPayslips({ page, limit: 20, month: filterMonth ? Number(filterMonth) : undefined, year: filterYear ? Number(filterYear) : undefined }),
             getEmployees({ limit: 100 })
           ]);
         setPayslips(payslipResponse.data);
+        setTotalPages(payslipResponse.pagination?.totalPages || 1);
         setEmployees(employeeResponse.data);
       } else {
         const response = await getMyPayslips();
@@ -139,7 +145,7 @@ export default function Payslips() {
 
   useEffect(() => {
     void loadPayslips();
-  }, [isAdmin]);
+  }, [canBrowseTenantPayslips, page, filterMonth, filterYear]);
 
   const handleEmployeeChange = (id: string) => {
     setEmployeeId(id);
@@ -343,6 +349,8 @@ export default function Payslips() {
           </Card>
         )}
 
+        {canBrowseTenantPayslips && <Card className="mb-6 p-4"><div className="grid gap-4 sm:grid-cols-2"><Select label="Filter month" value={filterMonth} onChange={(event) => { setFilterMonth(event.target.value); setPage(1); }}><option value="">All months</option>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</Select><Input label="Filter year" type="number" min={2000} max={2100} value={filterYear} onChange={(event) => { setFilterYear(event.target.value); setPage(1); }} /></div></Card>}
+
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left">
@@ -435,6 +443,7 @@ export default function Payslips() {
             </table>
           </div>
         </Card>
+        {canBrowseTenantPayslips && totalPages > 1 && <div className="mt-4 flex items-center justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1}><ChevronLeft size={15} />Previous</Button><span className="text-sm text-slate-500">Page {page} of {totalPages}</span><Button size="sm" variant="secondary" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={page === totalPages}>Next<ChevronRight size={15} /></Button></div>}
       </div>
     </div>
   );

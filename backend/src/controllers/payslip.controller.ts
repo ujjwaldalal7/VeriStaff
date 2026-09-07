@@ -99,16 +99,38 @@ const createPayslipSchema = z.object({
   deductions: moneySchema
 });
 
+const payslipListQuerySchema = z.object({
+  employeeId: z.string().uuid().optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  status: z.enum(["VALID", "REVOKED"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20)
+});
+
 export const listPayslips = asyncHandler(
   async (req: Request, res: Response) => {
     const auth = (req as AuthRequest).user!;
+    const query = payslipListQuerySchema.parse(req.query);
+    const where = {
+      ...(query.employeeId ? { employeeId: query.employeeId } : {}),
+      ...(query.month ? { month: query.month } : {}),
+      ...(query.year ? { year: query.year } : {}),
+      ...(query.status ? { generatedDocument: { status: query.status } } : {}),
+      employee: {
+        tenantId: auth.tenantId,
+        ...(auth.role === "MANAGER"
+          ? { managerAssignments: { some: { managerId: auth.userId } } }
+          : {})
+      }
+    };
+    const skip = (query.page - 1) * query.limit;
 
-    const payslips = await prisma.payslip.findMany({
-      where: {
-        employee: {
-          tenantId: auth.tenantId
-        }
-      },
+    const [payslips, total] = await prisma.$transaction([
+      prisma.payslip.findMany({
+      where,
+      skip,
+      take: query.limit,
       include: {
         employee: {
           select: {
@@ -139,12 +161,22 @@ export const listPayslips = asyncHandler(
           month: "desc"
         }
       ]
-    });
+      }),
+      prisma.payslip.count({ where })
+    ]);
 
     res.json({
       success: true,
       count: payslips.length,
-      data: payslips
+      data: payslips,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+        hasNextPage: query.page * query.limit < total,
+        hasPreviousPage: query.page > 1
+      }
     });
   }
 );
@@ -176,9 +208,9 @@ export const getMyPayslips = asyncHandler(
     }
 
     const payslips = await prisma.payslip.findMany({
-      where: {
-        employeeId: employee.id
-      },
+        where: {
+          employeeId: employee.id
+        },
       include: {
         generatedDocument: {
           select: {

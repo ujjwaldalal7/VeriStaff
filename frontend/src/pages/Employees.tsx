@@ -72,6 +72,7 @@ const formatDate = (date: string) => {
 
 interface EmployeeForm {
   employeeCode: string;
+  email: string;
   firstName: string;
   lastName: string;
   department: string;
@@ -85,6 +86,7 @@ interface EmployeeForm {
 
 const initialForm: EmployeeForm = {
   employeeCode: "",
+  email: "",
   firstName: "",
   lastName: "",
   department: "",
@@ -99,6 +101,8 @@ const initialForm: EmployeeForm = {
 
 export default function Employees() {
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "HR_ADMIN";
 
   const {
     employees,
@@ -225,6 +229,7 @@ export default function Employees() {
 
       await createEmployee({
         employeeCode: form.employeeCode.trim(),
+        email: form.email.trim() || undefined,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         department: form.department,
@@ -276,7 +281,7 @@ export default function Employees() {
             </p>
           </div>
 
-          <Button
+          {isAdmin && <Button
             onClick={() => {
               setFormError(null);
               setForm(initialForm);
@@ -285,7 +290,7 @@ export default function Employees() {
           >
             <UserPlus size={18} />
             Add Employee
-          </Button>
+          </Button>}
         </div>
 
         {/* Filters */}
@@ -633,6 +638,15 @@ export default function Employees() {
                 onChange={handleFormChange}
                 placeholder="VS003"
                 required
+              />
+
+              <Input
+                label="Employee Email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleFormChange}
+                placeholder="employee@company.com"
               />
             </div>
           </div>

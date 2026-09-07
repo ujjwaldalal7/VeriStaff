@@ -163,7 +163,7 @@ export const getEmployeeClearances = asyncHandler(
       throw new ApiError(404, "Employee not found");
     }
 
-    ensureEmployeeAccess(employee, auth);
+    await ensureEmployeeAccess(employee, auth);
 
     const clearances = await prisma.departmentClearance.findMany({
       where: {
@@ -341,7 +341,13 @@ export const updateClearance = asyncHandler(
                 id: employee.id
               },
               data: {
-                status: "OFFBOARDED"
+                status: "OFFBOARDED",
+                user: employee.userId ? {
+                  update: {
+                    isActive: false,
+                    tokenVersion: { increment: 1 }
+                  }
+                } : undefined
               }
             });
         }
@@ -416,7 +422,7 @@ export const getClearanceStatus = asyncHandler(
       throw new ApiError(404, "Employee not found");
     }
 
-    ensureEmployeeAccess(employee, auth);
+    await ensureEmployeeAccess(employee, auth);
 
     const clearances =
       await prisma.departmentClearance.findMany({

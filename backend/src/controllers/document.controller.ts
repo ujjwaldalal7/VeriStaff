@@ -45,7 +45,11 @@ const documentListQuerySchema = z.object({
     "EXPERIENCE_LETTER"
   ]).optional(),
 
-  employeeId: z.string().uuid().optional()
+  employeeId: z.string().uuid().optional(),
+  status: z.enum(["VALID", "REVOKED"]).optional(),
+  search: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20)
 });
 
 
@@ -522,8 +526,7 @@ export const getDocuments = asyncHandler(
 
     const query = documentListQuerySchema.parse(req.query);
 
-    const documents = await prisma.generatedDocument.findMany({
-      where: {
+    const where = {
         tenantId: auth.tenantId,
 
         ...(query.docType
@@ -536,32 +539,72 @@ export const getDocuments = asyncHandler(
           ? {
               employeeId: query.employeeId
             }
+          : {}),
+
+        ...(query.status ? { status: query.status } : {}),
+
+        ...(query.search
+          ? {
+              OR: [
+                { docNumber: { contains: query.search, mode: "insensitive" as const } },
+                { employee: { employeeCode: { contains: query.search, mode: "insensitive" as const } } },
+                { employee: { firstName: { contains: query.search, mode: "insensitive" as const } } },
+                { employee: { lastName: { contains: query.search, mode: "insensitive" as const } } }
+              ]
+            }
+          : {}),
+
+        ...(auth.role === "MANAGER"
+          ? {
+              employee: {
+                managerAssignments: {
+                  some: { managerId: auth.userId }
+                }
+              }
+            }
           : {})
-      },
+      };
 
-      include: {
-        employee: {
-          select: {
-            id: true,
-            employeeCode: true,
-            firstName: true,
-            lastName: true,
-            department: true,
-            designation: true,
-            status: true
+    const skip = (query.page - 1) * query.limit;
+    const [documents, total] = await prisma.$transaction([
+      prisma.generatedDocument.findMany({
+        where,
+        skip,
+        take: query.limit,
+
+        include: {
+          employee: {
+            select: {
+              id: true,
+              employeeCode: true,
+              firstName: true,
+              lastName: true,
+              department: true,
+              designation: true,
+              status: true
+            }
           }
-        }
-      },
+        },
 
-      orderBy: {
-        createdAt: "desc"
-      }
-    });
+        orderBy: {
+          createdAt: "desc"
+        }
+      }),
+      prisma.generatedDocument.count({ where })
+    ]);
 
     res.json({
       success: true,
       count: documents.length,
-      data: documents.map(({ pdfUrl: _pdfUrl, ...document }) => document)
+      data: documents.map(({ pdfUrl: _pdfUrl, ...document }) => document),
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+        hasNextPage: query.page * query.limit < total,
+        hasPreviousPage: query.page > 1
+      }
     });
   }
 );
@@ -576,7 +619,16 @@ export const getDocumentById = asyncHandler(
       await prisma.generatedDocument.findFirst({
         where: {
           id: documentId,
-          tenantId: auth.tenantId
+          tenantId: auth.tenantId,
+          ...(auth.role === "MANAGER"
+            ? {
+                employee: {
+                  managerAssignments: {
+                    some: { managerId: auth.userId }
+                  }
+                }
+              }
+            : {})
         },
 
         include: {
@@ -650,7 +702,16 @@ export const getEmployeeDocuments = asyncHandler(
       await prisma.generatedDocument.findMany({
         where: {
           employeeId: employee.id,
-          tenantId: auth.tenantId
+          tenantId: auth.tenantId,
+          ...(auth.role === "MANAGER"
+            ? {
+                employee: {
+                  managerAssignments: {
+                    some: { managerId: auth.userId }
+                  }
+                }
+              }
+            : {})
         },
 
         orderBy: {
@@ -903,7 +964,7 @@ const streamDocument = async (
       throw new ApiError(404, "Document not found");
     }
 
-    ensureEmployeeAccess(document.employee, auth);
+    await ensureEmployeeAccess(document.employee, auth);
 
     
     
@@ -925,7 +986,7 @@ const streamDocument = async (
     await createAuditLog({
       tenantId: auth.tenantId,
       actorId: auth.userId,
-      action: "DOCUMENT_DOWNLOAD",
+      action: disposition === "inline" ? "DOCUMENT_VIEW" : "DOCUMENT_DOWNLOAD",
       entityType: "GeneratedDocument",
       entityId: document.id,
       metadata: {

@@ -17,7 +17,8 @@ router.get(
   authenticate,
   authorize(
     "SUPER_ADMIN",
-    "HR_ADMIN"
+    "HR_ADMIN",
+    "MANAGER"
   ),
   listPayslips
 );

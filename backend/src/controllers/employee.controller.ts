@@ -11,6 +11,7 @@ import { createAuditLog } from "../utils/auditLog.js";
 
 const createEmployeeSchema = z.object({
   employeeCode: z.string().min(1).max(30),
+  email: z.string().email().optional(),
   firstName: z.string().min(1).max(50),
   lastName: z.string().min(1).max(50),
   department: z.string().min(1).max(100),
@@ -122,6 +123,7 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
     data: {
       tenantId: auth.tenantId,
       employeeCode: data.employeeCode,
+      email: data.email?.toLowerCase(),
       firstName: data.firstName,
       lastName: data.lastName,
       department: data.department,
@@ -184,6 +186,10 @@ export const listEmployees = asyncHandler(
 
     const where = {
       tenantId: auth.tenantId,
+
+      ...(auth.role === "MANAGER"
+        ? { managerAssignments: { some: { managerId: auth.userId } } }
+        : {}),
 
       ...(status
         ? {
@@ -279,7 +285,10 @@ export const getEmployee = asyncHandler(async (req: Request, res: Response) => {
   const employee = await prisma.employee.findFirst({
     where: {
       id: getRequiredParam(req, "id"),
-      tenantId: auth.tenantId
+      tenantId: auth.tenantId,
+      ...(auth.role === "MANAGER"
+        ? { managerAssignments: { some: { managerId: auth.userId } } }
+        : {})
     },
     include: {
       user: {
@@ -311,7 +320,7 @@ export const getEmployee = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, "Employee not found");
   }
 
-  ensureEmployeeAccess(employee, auth);
+  await ensureEmployeeAccess(employee, auth);
 
   res.json({
     success: true,

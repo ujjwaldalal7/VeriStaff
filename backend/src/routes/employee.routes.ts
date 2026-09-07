@@ -16,9 +16,9 @@ router.use(authenticate);
 
 router.get("/me",authorize("EMPLOYEE"),getMyProfile);
 router.patch("/me",authorize("EMPLOYEE"),updateMyProfile);
-router.get("/", authorize("SUPER_ADMIN", "HR_ADMIN"), listEmployees);
+router.get("/", authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER"), listEmployees);
 router.post("/", authorize("SUPER_ADMIN", "HR_ADMIN"), createEmployee);
-router.get("/:id", authorize("SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"), getEmployee);
+router.get("/:id", authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"), getEmployee);
 router.patch("/:id", authorize("SUPER_ADMIN", "HR_ADMIN"), updateEmployee);
 
 export default router;

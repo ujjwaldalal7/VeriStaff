@@ -9,6 +9,8 @@ export const getDocuments = async (params?: {
   limit?: number;
   docType?: DocumentType;
   employeeId?: string;
+  status?: "VALID" | "REVOKED";
+  search?: string;
 }) => {
   const response = await api.get<{
     success: boolean;

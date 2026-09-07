@@ -22,11 +22,23 @@ import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
 import VerifyDocument from "./pages/VerifyDocument";
 import RoleRoute from "./components/auth/RoleRoute";
+import UsersAccess from "./pages/UsersAccess";
+import { useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "./hooks/redux";
+import { validateSession } from "./store/slices/authSlice";
 
 function App() {
+  const dispatch = useAppDispatch();
+  const token = useAppSelector((state) => state.auth.token);
+  const loading = useAppSelector((state) => state.auth.loading);
+
+  useEffect(() => {
+    if (token) void dispatch(validateSession());
+  }, [dispatch, token]);
+
   return (
     <BrowserRouter>
-      <Routes>
+      {loading && token ? <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Checking session...</div> : <Routes>
         {/* Public */}
         <Route
           path="/"
@@ -59,7 +71,7 @@ function App() {
           element={
             <ProtectedRoute>
               <AppShell>
-                <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN"]}>
+                  <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "MANAGER"]}>
                   <Navigate
                     to="/dashboard"
                     replace
@@ -75,7 +87,7 @@ function App() {
           element={
             <ProtectedRoute>
               <AppShell>
-                <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN"]}>
+                  <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "MANAGER"]}>
                   <Dashboard />
                 </RoleRoute>
               </AppShell>
@@ -88,7 +100,7 @@ function App() {
           element={
             <ProtectedRoute>
               <AppShell>
-                <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN"]}>
+                  <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "MANAGER"]}>
                   <Employees />
                 </RoleRoute>
               </AppShell>
@@ -101,7 +113,7 @@ function App() {
           element={
             <ProtectedRoute>
               <AppShell>
-                <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"]}>
+                  <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"]}>
                   <EmployeeDetails />
                 </RoleRoute>
               </AppShell>
@@ -114,7 +126,7 @@ function App() {
           element={
             <ProtectedRoute>
               <AppShell>
-                <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"]}>
+                  <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"]}>
                   <Documents />
                 </RoleRoute>
               </AppShell>
@@ -142,6 +154,19 @@ function App() {
               <AppShell>
                 <RoleRoute roles={["SUPER_ADMIN", "HR_ADMIN"]}>
                   <Clearances />
+                </RoleRoute>
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <RoleRoute roles={["SUPER_ADMIN"]}>
+                  <UsersAccess />
                 </RoleRoute>
               </AppShell>
             </ProtectedRoute>
@@ -195,7 +220,7 @@ function App() {
             />
           }
         />
-      </Routes>
+      </Routes>}
     </BrowserRouter>
   );
 }

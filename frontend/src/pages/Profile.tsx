@@ -15,6 +15,7 @@ import {
 import { useAppSelector } from "../hooks/redux";
 import type { Employee } from "../types/employee";
 import { getApiErrorMessage } from "../utils/apiError";
+import { changePassword } from "../services/passwordApi";
 
 interface ProfileForm {
   firstName: string;
@@ -52,6 +53,8 @@ export default function Profile() {
     useState<string | null>(null);
   const [message, setMessage] =
     useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -88,6 +91,21 @@ export default function Profile() {
       ...current,
       [name]: value
     }));
+  };
+
+  const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      setPasswordSaving(true);
+      setError(null);
+      await changePassword(passwordForm);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setMessage("Password changed. Please sign in again.");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Unable to change password."));
+    } finally {
+      setPasswordSaving(false);
+    }
   };
 
   const handleSubmit = async (
@@ -229,6 +247,8 @@ export default function Profile() {
             </form>
           </Card>
         )}
+
+        <Card className="mt-6 p-6"><h2 className="text-lg font-semibold text-slate-900 dark:text-white">Change Password</h2><form onSubmit={handlePasswordChange} className="mt-4 grid gap-4 sm:grid-cols-3"><Input label="Current Password" type="password" required value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} /><Input label="New Password" type="password" minLength={8} required value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} /><Input label="Confirm Password" type="password" minLength={8} required value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })} /><div className="sm:col-span-3"><Button type="submit" disabled={passwordSaving}>{passwordSaving ? "Changing..." : "Change Password"}</Button></div></form></Card>
       </div>
     </div>
   );

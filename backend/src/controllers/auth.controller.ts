@@ -70,7 +70,8 @@ export const registerTenant = asyncHandler(async (req: Request, res: Response) =
     userId: result.user.id,
     tenantId: result.tenant.id,
     role: result.user.role,
-    email: result.user.email
+    email: result.user.email,
+    tokenVersion: result.user.tokenVersion
   });
 
   res.status(201).json({
@@ -100,7 +101,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     include: { tenant: true }
   });
 
-  if (!user || !(await comparePassword(data.password, user.passwordHash))) {
+  if (!user || !user.isActive || !(await comparePassword(data.password, user.passwordHash))) {
     throw new ApiError(401, "Invalid email or password");
   }
 
@@ -108,7 +109,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     userId: user.id,
     tenantId: user.tenantId,
     role: user.role,
-    email: user.email
+    email: user.email,
+    tokenVersion: user.tokenVersion
   });
 
   await createAuditLog({
@@ -170,6 +172,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       id: user.id,
       email: user.email,
       role: user.role,
+      isActive: user.isActive,
       tenant: user.tenant,
       employee: user.employee
     }

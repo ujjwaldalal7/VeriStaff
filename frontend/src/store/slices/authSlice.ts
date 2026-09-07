@@ -7,6 +7,7 @@ import type {
   RegisterOrganizationRequest
 } from "../../types/auth";
 import {
+  getCurrentUser,
   loginUser,
   registerOrganization
 } from "../../services/authApi";
@@ -103,6 +104,22 @@ export const register = createAsyncThunk<
   }
 );
 
+export const validateSession = createAsyncThunk<
+  AuthUser,
+  void,
+  { rejectValue: string }
+>("auth/validateSession", async (_, { rejectWithValue }) => {
+  try {
+    const response = await getCurrentUser();
+    return {
+      ...response.data,
+      tenantId: response.data.tenant?.id || ""
+    } as AuthUser;
+  } catch (error: unknown) {
+    return rejectWithValue(getErrorMessage(error, "Session expired."));
+  }
+});
+
 const authSlice = createSlice({
   name: "auth",
 
@@ -183,6 +200,23 @@ const authSlice = createSlice({
         state.error =
           action.payload ||
           "Unable to register organization";
+      })
+      .addCase(validateSession.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(validateSession.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.isAuthenticated = true;
+        localStorage.setItem("veristaff_user", JSON.stringify(action.payload));
+      })
+      .addCase(validateSession.rejected, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        localStorage.removeItem("veristaff_token");
+        localStorage.removeItem("veristaff_user");
       });
   }
 });

@@ -4,6 +4,7 @@ import {
   FilePlus2,
   RefreshCw,
   ShieldX
+  ,ChevronLeft, ChevronRight
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
@@ -12,6 +13,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Select from "../components/ui/Select";
+import Input from "../components/ui/Input";
 import {
   createDocument,
   downloadDocument,
@@ -58,6 +60,7 @@ export default function Documents() {
   const isAdmin =
     user?.role === "SUPER_ADMIN" ||
     user?.role === "HR_ADMIN";
+  const canBrowseTenantDocuments = isAdmin || user?.role === "MANAGER";
 
   const [documents, setDocuments] = useState<
     GeneratedDocument[]
@@ -75,6 +78,10 @@ export default function Documents() {
     useState<string | null>(null);
   const [message, setMessage] =
     useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "VALID" | "REVOKED">("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const employeeOptions = useMemo(
     () =>
@@ -90,14 +97,15 @@ export default function Documents() {
       setLoading(true);
       setError(null);
 
-      if (isAdmin) {
+      if (canBrowseTenantDocuments) {
         const [documentResponse, employeeResponse] =
           await Promise.all([
-            getDocuments(),
+            getDocuments({ page, limit: 20, search: search || undefined, status: statusFilter || undefined }),
             getEmployees({ limit: 100 })
           ]);
 
         setDocuments(documentResponse.data);
+        setTotalPages(documentResponse.pagination?.totalPages || 1);
         setEmployees(employeeResponse.data);
       } else {
         const response = await getMyDocuments();
@@ -117,7 +125,7 @@ export default function Documents() {
 
   useEffect(() => {
     void loadDocuments();
-  }, [isAdmin]);
+  }, [canBrowseTenantDocuments, page, search, statusFilter]);
 
   const handleGenerate = async (
     event: FormEvent<HTMLFormElement>
@@ -307,6 +315,8 @@ export default function Documents() {
           </Card>
         )}
 
+        {canBrowseTenantDocuments && <Card className="mb-6 p-4"><div className="grid gap-4 sm:grid-cols-[1fr_180px]"><Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Document number or employee" /><Select label="Status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as "" | "VALID" | "REVOKED"); setPage(1); }}><option value="">All statuses</option><option value="VALID">Valid</option><option value="REVOKED">Revoked</option></Select></div></Card>}
+
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
@@ -432,6 +442,7 @@ export default function Documents() {
             </table>
           </div>
         </Card>
+        {canBrowseTenantDocuments && totalPages > 1 && <div className="mt-4 flex items-center justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1}><ChevronLeft size={15} />Previous</Button><span className="text-sm text-slate-500">Page {page} of {totalPages}</span><Button size="sm" variant="secondary" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={page === totalPages}>Next<ChevronRight size={15} /></Button></div>}
       </div>
     </div>
   );

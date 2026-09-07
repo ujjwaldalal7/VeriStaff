@@ -11,7 +11,7 @@ import { createAuditLog } from "../utils/auditLog.js";
 
 const inviteSchema = z.object({
   employeeId: z.string().uuid(),
-  email: z.string().email(),
+  email: z.string().email().optional(),
   expiresInHours: z.number().int().min(1).max(168).default(48)
 });
 
@@ -89,6 +89,11 @@ export const createInvite = asyncHandler(
       );
     }
 
+    const inviteEmail = (data.email ?? employee.email)?.toLowerCase();
+    if (!inviteEmail) {
+      throw new ApiError(400, "Employee email is required to create an invitation");
+    }
+
     const existingInvite = await prisma.onboardingInvite.findFirst({
       where: {
         employeeId: employee.id,
@@ -117,7 +122,7 @@ export const createInvite = asyncHandler(
         data: {
           tenantId: auth.tenantId,
           employeeId: employee.id,
-          email: data.email.toLowerCase(),
+          email: inviteEmail,
           token,
           expiresAt
         }
@@ -138,7 +143,7 @@ export const createInvite = asyncHandler(
     await createAuditLog({
       tenantId: auth.tenantId,
       actorId: auth.userId,
-      action: "EMPLOYEE_UPDATE",
+      action: "ONBOARDING_INVITE",
       entityType: "Employee",
       entityId: employee.id,
       metadata: {
@@ -324,7 +329,7 @@ export const completeOnboarding = asyncHandler(
 
     await createAuditLog({
       tenantId: result.employee.tenantId,
-      action: "EMPLOYEE_UPDATE",
+      action: "ONBOARDING_COMPLETE",
       entityType: "Employee",
       entityId: result.employee.id,
       metadata: {

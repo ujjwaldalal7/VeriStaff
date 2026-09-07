@@ -101,7 +101,8 @@ export const changePassword = asyncHandler(
         id: user.id
       },
       data: {
-        passwordHash
+        passwordHash,
+        tokenVersion: { increment: 1 }
       }
     });
 
@@ -180,7 +181,8 @@ export const resetEmployeePassword = asyncHandler(
         id: employee.user.id
       },
       data: {
-        passwordHash
+        passwordHash,
+        tokenVersion: { increment: 1 }
       }
     });
 

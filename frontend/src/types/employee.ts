@@ -11,6 +11,7 @@ export interface Employee {
   userId: string | null;
 
   employeeCode: string;
+  email: string | null;
   firstName: string;
   lastName: string;
 

@@ -33,14 +33,15 @@ const navigationItems: NavigationItem[] = [
     icon: LayoutDashboard,
     roles: [
       "SUPER_ADMIN",
-      "HR_ADMIN"
+      "HR_ADMIN",
+      "MANAGER"
     ]
   },
   {
     label: "Employees",
     path: "/employees",
     icon: Users,
-    roles: ["SUPER_ADMIN", "HR_ADMIN"]
+    roles: ["SUPER_ADMIN", "HR_ADMIN", "MANAGER"]
   },
   {
     label: "Documents",
@@ -49,6 +50,7 @@ const navigationItems: NavigationItem[] = [
     roles: [
       "SUPER_ADMIN",
       "HR_ADMIN",
+      "MANAGER",
       "EMPLOYEE"
     ]
   },
@@ -56,13 +58,19 @@ const navigationItems: NavigationItem[] = [
     label: "Payslips",
     path: "/payslips",
     icon: WalletCards,
-    roles: ["SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"]
+    roles: ["SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"]
   },
   {
     label: "Clearances",
     path: "/clearances",
     icon: ClipboardCheck,
     roles: ["SUPER_ADMIN", "HR_ADMIN"]
+  },
+  {
+    label: "Users & Access",
+    path: "/users",
+    icon: Users,
+    roles: ["SUPER_ADMIN"]
   },
   {
     label: "Audit Logs",

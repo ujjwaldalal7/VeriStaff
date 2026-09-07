@@ -24,7 +24,7 @@ const router = Router();
 router.get(
   "/",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER"),
   getDocuments
 );
 
@@ -35,7 +35,7 @@ router.get(
 router.get(
   "/employee/:employeeId",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER"),
   getEmployeeDocuments
 );
 
@@ -53,14 +53,14 @@ router.get(
 router.get(
   "/:id/download",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"),
   getDocumentDownload
 );
 
 router.get(
   "/:id/view",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN", "EMPLOYEE"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER", "EMPLOYEE"),
   getDocumentView
 );
 
@@ -70,7 +70,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
-  authorize("SUPER_ADMIN", "HR_ADMIN"),
+  authorize("SUPER_ADMIN", "HR_ADMIN", "MANAGER"),
   getDocumentById
 );
 
