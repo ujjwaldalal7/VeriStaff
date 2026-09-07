@@ -1,22 +1,13 @@
 import api from "./api";
-
-export interface TenantBranding {
-  id: string;
-  name: string;
-  domain: string;
-  logoUrl: string | null;
-  watermarkUrl: string | null;
-  primaryColor: string;
-  secondaryColor: string;
-  footerAddress: string;
-  authorizedSignUrl: string | null;
-}
+import type {
+  TenantBranding,
+  TenantResponse
+} from "../types/tenant";
 
 export const getTenant = async () => {
-  const response = await api.get<{
-    success: boolean;
-    data: TenantBranding;
-  }>("/tenant/me");
+  const response = await api.get<TenantResponse>(
+    "/tenants/me"
+  );
 
   return response.data;
 };
@@ -25,7 +16,7 @@ export const updateTenantBranding = async (
   data: Partial<TenantBranding>
 ) => {
   const response = await api.patch(
-    "/tenant/me",
+    "/tenants/me",
     data
   );
 
@@ -41,7 +32,7 @@ export const uploadBrandingAsset = async (
   formData.append("file", file);
 
   const response = await api.post(
-    `/tenant/me/branding/${assetType}`,
+    `/tenants/me/branding/${assetType}`,
     formData,
     {
       headers: {

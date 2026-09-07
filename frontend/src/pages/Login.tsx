@@ -1,13 +1,19 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate
+} from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { login } from "../store/slices/authSlice";
+import { fetchTenant } from "../store/slices/tenantSlice";
 import Logo from "../components/ui/Logo";
 
 export default function Login() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { loading, error } = useAppSelector(
     (state) => state.auth
@@ -29,7 +35,26 @@ export default function Login() {
     );
 
     if (login.fulfilled.match(result)) {
-      navigate("/dashboard");
+      await dispatch(fetchTenant());
+
+      const defaultPath =
+        result.payload.user.role === "SUPER_ADMIN" ||
+        result.payload.user.role === "HR_ADMIN"
+          ? "/dashboard"
+          : "/profile";
+
+      const from =
+        location.state &&
+        typeof location.state === "object" &&
+        "from" in location.state
+          ? (
+              location.state.from as {
+                pathname?: string;
+              }
+            ).pathname
+          : defaultPath;
+
+      navigate(from || defaultPath);
     }
   };
 
@@ -106,6 +131,16 @@ export default function Login() {
 
         <p className="mt-6 text-center text-xs text-slate-500">
           Secure HR management powered by VeriStaff
+        </p>
+
+        <p className="mt-4 text-center text-sm text-slate-400">
+          New organization?{" "}
+          <Link
+            to="/register"
+            className="font-medium text-blue-300 hover:text-blue-200"
+          >
+            Register here
+          </Link>
         </p>
       </div>
     </div>

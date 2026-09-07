@@ -1,8 +1,17 @@
-import { useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type ReactNode
+} from "react";
 import { Menu, X } from "lucide-react";
 
 import Navbar from "../components/layout/Navbar";
 import Sidebar from "../components/layout/Sidebar";
+import { fetchTenant } from "../store/slices/tenantSlice";
+import {
+  useAppDispatch,
+  useAppSelector
+} from "../hooks/redux";
 
 interface AppShellProps {
   children: ReactNode;
@@ -10,9 +19,38 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const dispatch = useAppDispatch();
+  const tenant = useAppSelector(
+    (state) => state.tenant.current
+  );
+  const tenantLoading = useAppSelector(
+    (state) => state.tenant.loading
+  );
+  const tenantError = useAppSelector(
+    (state) => state.tenant.error
+  );
+
+  useEffect(() => {
+    if (!tenant && !tenantLoading && !tenantError) {
+      dispatch(fetchTenant());
+    }
+  }, [
+    dispatch,
+    tenant,
+    tenantLoading,
+    tenantError
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <div
+        className="h-1 w-full"
+        style={{
+          background:
+            "linear-gradient(90deg, var(--tenant-primary-color), var(--tenant-secondary-color))"
+        }}
+      />
+
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -35,7 +73,11 @@ export default function AppShell({ children }: AppShellProps) {
         <button
           type="button"
           onClick={() => setSidebarOpen((value) => !value)}
-          className="fixed bottom-5 left-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 lg:hidden"
+          className="fixed bottom-5 left-5 z-50 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg lg:hidden"
+          style={{
+            backgroundColor:
+              "var(--tenant-primary-color)"
+          }}
           aria-label={
             sidebarOpen
               ? "Close navigation"

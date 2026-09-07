@@ -1,22 +1,16 @@
 import api from "./api";
 import type {
   Employee,
-  EmployeeListResponse
+  EmployeeListResponse,
+    EmployeeListParams
 } from "../types/employee";
 
-export interface EmployeeListParams {
-  search?: string;
-  status?: string;
-  department?: string;
-  page?: number;
-  limit?: number;
-}
+
 
 export interface CreateEmployeeRequest {
   employeeCode: string;
   firstName: string;
   lastName: string;
-  email?: string;
   department: string;
   designation: string;
   joiningDate: string;
@@ -28,6 +22,14 @@ export interface CreateEmployeeRequest {
 
 export type UpdateEmployeeRequest =
   Partial<CreateEmployeeRequest>;
+
+export interface UpdateMyProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  bankAccountNo?: string | null;
+  bankIfsc?: string | null;
+  panCard?: string | null;
+}
 
 export const getEmployees = async (
   params?: EmployeeListParams
@@ -84,7 +86,7 @@ export const updateEmployee = async (
 };
 
 export const updateMyProfile = async (
-  data: UpdateEmployeeRequest
+  data: UpdateMyProfileRequest
 ) => {
   const response = await api.patch<{
     success: boolean;
@@ -94,17 +96,3 @@ export const updateMyProfile = async (
   return response.data;
 };
 
-export const resignEmployee = async (
-  employeeId: string,
-  data?: {
-    resignationDate?: string;
-    lastWorkingDay?: string;
-  }
-) => {
-  const response = await api.post(
-    `/employees/${employeeId}/resign`,
-    data
-  );
-
-  return response.data;
-};

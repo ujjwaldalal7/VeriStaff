@@ -12,6 +12,9 @@ export default function Navbar() {
   const user = useAppSelector(
     (state) => state.auth.user
   );
+  const tenant = useAppSelector(
+    (state) => state.tenant.current
+  );
 
   const handleLogout = () => {
     dispatch(logout());
@@ -19,7 +22,19 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-[73px] items-center justify-end border-b border-slate-200 bg-white/95 px-5 backdrop-blur sm:px-8 dark:border-slate-800 dark:bg-slate-900/95">
+    <header className="sticky top-0 z-30 flex h-[73px] items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur sm:px-8 dark:border-slate-800 dark:bg-slate-900/95">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+          {tenant?.name || "Workspace"}
+        </p>
+
+        {tenant?.domain && (
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+            {tenant.domain}
+          </p>
+        )}
+      </div>
+
       <div className="flex items-center gap-3">
         {/* Theme */}
         <ThemeToggle />

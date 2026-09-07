@@ -1,7 +1,9 @@
 import api from "./api";
 import type {
   LoginRequest,
-  LoginResponse
+  LoginResponse,
+  RegisterOrganizationRequest,
+  RegisterOrganizationResponse
 } from "../types/auth";
 
 export const loginUser = async (
@@ -11,6 +13,18 @@ export const loginUser = async (
     "/auth/login",
     credentials
   );
+
+  return response.data;
+};
+
+export const registerOrganization = async (
+  payload: RegisterOrganizationRequest
+) => {
+  const response =
+    await api.post<RegisterOrganizationResponse>(
+      "/auth/register-tenant",
+      payload
+    );
 
   return response.data;
 };

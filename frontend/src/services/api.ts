@@ -23,6 +23,11 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("veristaff_token");
       localStorage.removeItem("veristaff_user");
+      localStorage.removeItem("veristaff_tenant");
+
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
     }
 
     return Promise.reject(error);

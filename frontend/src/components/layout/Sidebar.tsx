@@ -1,9 +1,9 @@
 import {
-  BarChart3,
   ClipboardCheck,
   FileText,
   LayoutDashboard,
   Settings,
+  UserCircle,
   Users,
   X,
   ScrollText,
@@ -33,16 +33,14 @@ const navigationItems: NavigationItem[] = [
     icon: LayoutDashboard,
     roles: [
       "SUPER_ADMIN",
-      "HR_ADMIN",
-      "MANAGER",
-      "EMPLOYEE"
+      "HR_ADMIN"
     ]
   },
   {
     label: "Employees",
     path: "/employees",
     icon: Users,
-    roles: ["SUPER_ADMIN", "HR_ADMIN", "MANAGER"]
+    roles: ["SUPER_ADMIN", "HR_ADMIN"]
   },
   {
     label: "Documents",
@@ -51,7 +49,6 @@ const navigationItems: NavigationItem[] = [
     roles: [
       "SUPER_ADMIN",
       "HR_ADMIN",
-      "MANAGER",
       "EMPLOYEE"
     ]
   },
@@ -74,16 +71,21 @@ const navigationItems: NavigationItem[] = [
     roles: ["SUPER_ADMIN", "HR_ADMIN"]
   },
   {
-    label: "Analytics",
-    path: "/analytics",
-    icon: BarChart3,
-    roles: ["SUPER_ADMIN", "HR_ADMIN"]
-  },
-  {
     label: "Settings",
     path: "/settings",
     icon: Settings,
     roles: ["SUPER_ADMIN", "HR_ADMIN"]
+  },
+  {
+    label: "Profile",
+    path: "/profile",
+    icon: UserCircle,
+    roles: [
+      "SUPER_ADMIN",
+      "HR_ADMIN",
+      "MANAGER",
+      "EMPLOYEE"
+    ]
   }
 ];
 
@@ -93,6 +95,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const user = useAppSelector(
     (state) => state.auth.user
+  );
+  const tenant = useAppSelector(
+    (state) => state.tenant.current
   );
 
   const visibleItems = navigationItems.filter(
@@ -119,6 +124,8 @@ export default function Sidebar({
           variant="full"
           size="sm"
           linkTo="/dashboard"
+          logoUrl={tenant?.logoUrl}
+          name={tenant?.name || "VeriStaff"}
         />
 
         <button
@@ -151,9 +158,17 @@ export default function Sidebar({
                     "flex items-center gap-3 rounded-lg px-3 py-2.5",
                     "text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400"
+                      ? "bg-slate-100 text-slate-950 dark:bg-slate-800 dark:text-white"
                       : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                   ].join(" ")
+                }
+                style={({ isActive }) =>
+                  isActive
+                    ? {
+                        borderLeft:
+                          "3px solid var(--tenant-primary-color)"
+                      }
+                    : undefined
                 }
               >
                 <Icon size={19} strokeWidth={1.8} />
@@ -168,6 +183,10 @@ export default function Sidebar({
       {/* Bottom user section */}
       <div className="border-t border-slate-200 p-4 dark:border-slate-800">
         <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+          <p className="mb-2 truncate text-xs font-semibold uppercase tracking-wider text-slate-400">
+            {tenant?.name || "Workspace"}
+          </p>
+
           <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
             {user?.email}
           </p>

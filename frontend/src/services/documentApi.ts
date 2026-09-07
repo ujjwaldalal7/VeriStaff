@@ -33,7 +33,10 @@ export const getEmployeeDocuments = async (
 ) => {
   const response = await api.get<{
     success: boolean;
-    data: GeneratedDocument[];
+    data: {
+      employee: unknown;
+      documents: GeneratedDocument[];
+    };
   }>(`/documents/employee/${employeeId}`);
 
   return response.data;
@@ -42,7 +45,10 @@ export const getEmployeeDocuments = async (
 export const getMyDocuments = async () => {
   const response = await api.get<{
     success: boolean;
-    data: GeneratedDocument[];
+    data: {
+      employee: unknown;
+      documents: GeneratedDocument[];
+    };
   }>("/documents/me");
 
   return response.data;

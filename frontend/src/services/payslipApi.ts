@@ -4,11 +4,19 @@ export interface CreatePayslipRequest {
   employeeId: string;
   month: number;
   year: number;
-  basicSalary: number;
-  hra: number;
-  allowances: number;
-  deductions: number;
 }
+
+export const getPayslips = async () => {
+  const response = await api.get("/payslips");
+
+  return response.data;
+};
+
+export const getMyPayslips = async () => {
+  const response = await api.get("/payslips/me");
+
+  return response.data;
+};
 
 export const createPayslip = async (
   data: CreatePayslipRequest
