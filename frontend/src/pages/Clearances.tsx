@@ -9,7 +9,6 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Select from "../components/ui/Select";
-import Input from "../components/ui/Input";
 import {
   getClearanceStatus,
   updateClearance
@@ -248,8 +247,18 @@ export default function Clearances() {
 
               {rejectingDepartment === clearance.department && (
                 <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-                  <Input label="Rejection Remarks" value={remarks} onChange={(event) => setRemarks(event.target.value)} required />
-                  <div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setRejectingDepartment(null)}>Cancel</Button><Button size="sm" variant="danger" onClick={() => void handleUpdate(clearance.department, "REJECTED")} disabled={!remarks.trim() || working === clearance.department}>Confirm Rejection</Button></div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Rejection Remarks
+                    <textarea
+                      value={remarks}
+                      onChange={(event) => setRemarks(event.target.value)}
+                      rows={4}
+                      required
+                      placeholder="Explain what remains outstanding"
+                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    />
+                  </label>
+                  <div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setRejectingDepartment(null)}>Cancel</Button><Button size="sm" variant="danger" onClick={() => void handleUpdate(clearance.department, "REJECTED")} disabled={!remarks.trim() || working === clearance.department}>Reject</Button></div>
                 </div>
               )}
             </Card>

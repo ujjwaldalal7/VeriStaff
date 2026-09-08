@@ -10,7 +10,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const passwordHash = await hashPassword("<PASSWORD>");
+  const passwordHash = await hashPassword(""); // Set a default password for the admin user
 
   const tenant = await prisma.tenant.upsert({
     where: { domain: "demo.veristaff.local" },
@@ -66,7 +66,7 @@ async function main() {
   console.log("Seed complete:", {
     tenant: tenant.domain,
     adminEmail: "admin@veristaff.local",
-    adminPassword: "<PASSWORD>",
+    adminPassword: "", // Default password for the admin user
     employeeId: employee.id
   });
 }

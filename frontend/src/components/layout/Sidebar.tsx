@@ -111,7 +111,9 @@ export default function Sidebar({
   const visibleItems = navigationItems.filter(
     (item) =>
       user?.role &&
-      item.roles.includes(user.role)
+      item.roles.includes(user.role) &&
+      !(user.employeeStatus === "OFFBOARDED" &&
+        !["/documents", "/payslips", "/profile"].includes(item.path))
   );
 
   return (

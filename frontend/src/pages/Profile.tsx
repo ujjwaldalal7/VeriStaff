@@ -4,6 +4,7 @@ import type {
   FormEvent
 } from "react";
 import { Save } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -12,7 +13,8 @@ import {
   getMyProfile,
   updateMyProfile
 } from "../services/employeeApi";
-import { useAppSelector } from "../hooks/redux";
+import { useAppDispatch, useAppSelector } from "../hooks/redux";
+import { logout } from "../store/slices/authSlice";
 import type { Employee } from "../types/employee";
 import { getApiErrorMessage } from "../utils/apiError";
 import { changePassword } from "../services/passwordApi";
@@ -36,6 +38,8 @@ const toForm = (
 });
 
 export default function Profile() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const user = useAppSelector(
     (state) => state.auth.user
   );
@@ -101,6 +105,10 @@ export default function Profile() {
       await changePassword(passwordForm);
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setMessage("Password changed. Please sign in again.");
+      window.setTimeout(() => {
+        dispatch(logout());
+        navigate("/login", { replace: true });
+      }, 700);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Unable to change password."));
     } finally {
@@ -151,6 +159,11 @@ export default function Profile() {
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {user?.email}
           </p>
+          {user?.employeeStatus === "OFFBOARDED" && (
+            <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+              Your employment has ended. You can continue accessing your profile, payslips and employment documents.
+            </p>
+          )}
         </div>
 
         {(error || message) && (

@@ -9,6 +9,7 @@ export interface AuthUser {
   tenantId: string;
   email: string;
   role: UserRole;
+  employeeStatus?: "INVITED" | "ONBOARDING" | "ACTIVE" | "RESIGNED" | "OFFBOARDED" | null;
 }
 
 export interface AuthTenant {

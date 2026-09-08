@@ -75,7 +75,7 @@ export const changePassword = asyncHandler(
 
     if (!currentPasswordValid) {
       throw new ApiError(
-        401,
+        400,
         "Current password is incorrect"
       );
     }

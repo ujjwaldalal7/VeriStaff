@@ -98,7 +98,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   const user = await prisma.user.findUnique({
     where: { email: data.email.toLowerCase() },
-    include: { tenant: true }
+    include: {
+      tenant: true,
+      employee: { select: { status: true } }
+    }
   });
 
   if (!user || !user.isActive || !(await comparePassword(data.password, user.passwordHash))) {
@@ -135,6 +138,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         role: user.role
+        ,employeeStatus: user.employee?.status ?? null
       },
       tenant: {
         id: user.tenant.id,
@@ -173,6 +177,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      employeeStatus: user.employee?.status ?? null,
       tenant: user.tenant,
       employee: user.employee
     }

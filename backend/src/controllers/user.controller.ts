@@ -13,7 +13,11 @@ const createUserSchema = z.object({
   firstName: z.string().trim().min(1).max(50),
   lastName: z.string().trim().min(1).max(50),
   password: z.string().min(8).max(72),
-  role: z.enum(["HR_ADMIN", "MANAGER"])
+  role: z.enum(["HR_ADMIN", "MANAGER"]),
+  employeeCode: z.string().trim().min(1).max(30),
+  department: z.string().trim().min(1).max(100),
+  designation: z.string().trim().min(1).max(100),
+  joiningDate: z.coerce.date()
 });
 
 const updateRoleSchema = z.object({
@@ -115,16 +119,37 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new ApiError(409, "Email is already registered");
 
-  const user = await prisma.user.create({
-    data: {
-      tenantId: auth.tenantId,
-      email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      passwordHash: await hashPassword(data.password),
-      role: data.role
-    },
-    select: userSelect
+  const user = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        tenantId: auth.tenantId,
+        email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        passwordHash: await hashPassword(data.password),
+        role: data.role
+      }
+    });
+
+    await tx.employee.create({
+      data: {
+        tenantId: auth.tenantId,
+        userId: createdUser.id,
+        email,
+        employeeCode: data.employeeCode,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        department: data.department,
+        designation: data.designation,
+        joiningDate: data.joiningDate,
+        status: "ACTIVE"
+      }
+    });
+
+    return tx.user.findUniqueOrThrow({
+      where: { id: createdUser.id },
+      select: userSelect
+    });
   });
 
   await createAuditLog({ tenantId: auth.tenantId, actorId: auth.userId, action: "USER_CREATE", entityType: "User", entityId: user.id, metadata: { role: data.role, email } });
@@ -140,6 +165,13 @@ export const updateUserRole = asyncHandler(async (req: Request, res: Response) =
   const user = await prisma.user.findFirst({ where: { id: userId, tenantId: auth.tenantId } });
   if (!user) throw new ApiError(404, "User not found");
   if (user.role === "SUPER_ADMIN") throw new ApiError(400, "Super admin roles cannot be changed here");
+  if (data.role !== "EMPLOYEE") {
+    const employee = await prisma.employee.findFirst({
+      where: { userId: user.id, tenantId: auth.tenantId },
+      select: { id: true }
+    });
+    if (!employee) throw new ApiError(400, "This role requires a linked employee profile");
+  }
 
   const updated = await prisma.user.update({ where: { id: user.id }, data: { role: data.role, tokenVersion: { increment: 1 } }, select: userSelect });
   await createAuditLog({ tenantId: auth.tenantId, actorId: auth.userId, action: "USER_ROLE_CHANGE", entityType: "User", entityId: user.id, metadata: { from: user.role, to: data.role } });

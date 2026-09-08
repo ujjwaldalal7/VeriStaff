@@ -342,12 +342,6 @@ export const updateClearance = asyncHandler(
               },
               data: {
                 status: "OFFBOARDED",
-                user: employee.userId ? {
-                  update: {
-                    isActive: false,
-                    tokenVersion: { increment: 1 }
-                  }
-                } : undefined
               }
             });
         }

@@ -17,7 +17,7 @@ export const getUsers = async (params?: { search?: string; role?: string; page?:
   return response.data;
 };
 
-export const createUser = async (data: { email: string; firstName: string; lastName: string; password: string; role: "HR_ADMIN" | "MANAGER" }) => {
+export const createUser = async (data: { email: string; firstName: string; lastName: string; password: string; role: "HR_ADMIN" | "MANAGER"; employeeCode: string; department: string; designation: string; joiningDate: string }) => {
   const response = await api.post<{ success: boolean; data: TenantUser }>("/users", data);
   return response.data;
 };
@@ -39,5 +39,10 @@ export const resetUserPassword = async (id: string, newPassword: string, confirm
 
 export const assignManagerEmployee = async (managerId: string, employeeId: string) => {
   const response = await api.post(`/users/${managerId}/assignments`, { employeeId });
+  return response.data;
+};
+
+export const unassignManagerEmployee = async (managerId: string, employeeId: string) => {
+  const response = await api.delete(`/users/${managerId}/assignments/${employeeId}`);
   return response.data;
 };
